@@ -313,8 +313,8 @@ GLAMODrawInit(ScreenPtr pScreen)
 	 */
 
 	glamos->kaa.flags = KAA_OFFSCREEN_PIXMAPS;
-	glamos->kaa.offsetAlign = 2;
-	glamos->kaa.pitchAlign = 2;
+	glamos->kaa.offsetAlign = 0;
+	glamos->kaa.pitchAlign = 0;
 
 	kaaInitTrapOffsets(8, sample_offsets_x, sample_offsets_y, 0.0, 0.0);
 	sample_count = (1 << 8) - 1;
