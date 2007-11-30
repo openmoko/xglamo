@@ -49,16 +49,10 @@ InitOutput(ScreenInfo *pScreenInfo, int argc, char **argv)
 void
 InitInput(int argc, char **argv)
 {
-	KdKeyboardInfo *ki;
-
-	KdAddKeyboardDriver(&LinuxKeyboardDriver);
-	KdAddPointerDriver(&LinuxMouseDriver);
-#ifdef TSLIB
-	KdAddPointerDriver(&TsDriver);
+	KdInitInput (&LinuxEvdevMouseFuncs, &LinuxEvdevKeyboardFuncs);
+#ifdef TOUCHSCREEN
+	KdAddMouseDriver (&TsFuncs);
 #endif
-
-	ki = KdParseKeyboard("keybd");
-	KdAddKeyboard(ki);
 }
 
 void

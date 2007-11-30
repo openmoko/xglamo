@@ -19,14 +19,19 @@ if KDRIVELINUX
 LINUX_SUBDIRS = linux
 endif
 
+if KDRIVEGLAMO
+GLAMO_SUBDIRS = glamo
+endif
+
 SUBDIRS =			\
 	src			\
 	$(LINUX_SUBDIRS)	\
 	$(XSDL_SUBDIRS)		\
 	$(FBDEV_SUBDIRS)	\
 	$(VESA_SUBDIRS)		\
+	$(GLAMO_SUBDIRS)	\
 	$(XEPHYR_SUBDIRS)       \
 	fake
 
 DIST_SUBDIRS = vesa ati chips epson i810 mach64 mga neomagic nvidia pm2 r128 \
-               smi via fbdev sdl ephyr src linux fake sis300
+               smi via fbdev sdl ephyr src linux fake sis300 glamo

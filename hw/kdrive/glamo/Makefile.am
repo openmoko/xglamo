@@ -41,11 +41,14 @@ GLAMO_LIBS =				\
 
 Xglamo_LDADD = \
 	$(GLAMO_LIBS)			\
-	@KDRIVE_LIBS@
+	@KDRIVE_LIBS@			\
+	@XSERVER_LIBS@
 
 Xglamo_DEPENDENCIES =	\
 	libglamo.a 			\
-	@KDRIVE_LOCAL_LIBS@
+        $(FBDEV_LIBS)                   \
+        $(VESA_LIBS)                    \
+        $(DRI_LIBS)
 
 relink:
 	rm -f $(bin_PROGRAMS) && make $(bin_PROGRAMS)
