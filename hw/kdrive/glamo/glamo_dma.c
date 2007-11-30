@@ -25,6 +25,7 @@
 
 #include <sys/time.h>
 
+#include "glamo-log.h"
 #include "glamo.h"
 #include "glamo-regs.h"
 #include "glamo_dma.h"
@@ -35,9 +36,7 @@
 #include "glamo_sarea.h"
 #endif /* USE_DRI */
 
-#define DEBUG_FIFO 1
-
-#if DEBUG_FIFO
+#ifndef NDEBUG
 static void
 GLAMODebugFifo(GLAMOScreenInfo *glamos)
 {
@@ -273,7 +272,7 @@ GLAMODispatchIndirectDMA(GLAMOScreenInfo *glamos)
 		count--;
 	}
 	if (TIMEDOUT()) {
-		ErrorF("Timeout submitting packets, resetting...\n");
+		GLAMO_LOG_ERROR("Timeout submitting packets, resetting...\n");
 		GLAMOEngineReset(glamos->screen->pScreen, GLAMO_ENGINE_CQ);
 		GLAMODrawSetup(glamos->screen->pScreen);
 	}
@@ -291,11 +290,6 @@ GLAMOFlushIndirect(GLAMOScreenInfo *glamos, Bool discard)
 
 	if ((glamos->indirectStart == buf->used) && !discard)
 		return;
-
-#if DEBUG_FIFO
-	ErrorF("Dispatching %d DWORDS\n", (buf->used - glamos->indirectStart) /
-	    4);
-#endif
 
 #ifdef USE_DRI
 	if (glamos->using_dri) {
@@ -384,11 +378,6 @@ GLAMODMASetup(ScreenPtr pScreen)
 	glamos->indirectBuffer = GLAMOGetDMABuffer(glamos);
 	if (glamos->indirectBuffer == FALSE)
 		FatalError("Failed to allocate DMA buffer.\n");
-
-	if (glamos->using_dri)
-		ErrorF("Initialized DRI DMA\n");
-	else
-		ErrorF("Initialized DMA\n");
 }
 
 void

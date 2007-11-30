@@ -20,6 +20,7 @@ bin_PROGRAMS = Xglamo
 noinst_LIBRARIES = libglamo.a
 
 libglamo_a_SOURCES = 	\
+	glamo-log.h	\
 	glamo_dma.c	\
 	glamo_dma.h	\
 	glamo_draw.c	\
