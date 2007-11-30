@@ -1,0 +1,51 @@
+if KDRIVEFBDEV
+FBDEV_INCLUDES =-I$(top_srcdir)/hw/kdrive/fbdev
+FBDEV_LIBS = $(top_builddir)/hw/kdrive/fbdev/libfbdev.a
+endif
+
+if KDRIVEVESA
+VESA_INCLUDES = -I$(top_srcdir)/hw/kdrive/vesa
+VESA_LIBS = $(top_builddir)/hw/kdrive/vesa/libvesa.a
+endif
+
+INCLUDES = 					\
+	@KDRIVE_INCS@				\
+	$(DRI_INCLUDES)				\
+	$(FBDEV_INCLUDES)			\
+	$(VESA_INCLUDES)			\
+	@KDRIVE_CFLAGS@
+
+bin_PROGRAMS = Xglamo
+
+noinst_LIBRARIES = libglamo.a
+
+libglamo_a_SOURCES = 	\
+	glamo_dma.c	\
+	glamo_dma.h	\
+	glamo_draw.c	\
+	glamo_draw.h	\
+	glamo.c		\
+	glamo.h		\
+	glamo-regs.h	\
+	glamo_video.c
+
+Xglamo_SOURCES = \
+	glamo_stub.c
+
+GLAMO_LIBS =				\
+	libglamo.a 			\
+	$(FBDEV_LIBS)			\
+	$(VESA_LIBS)			\
+	$(DRI_LIBS)			\
+	@KDRIVE_LIBS@
+
+Xglamo_LDADD = \
+	$(GLAMO_LIBS)			\
+	@KDRIVE_LIBS@
+
+Xglamo_DEPENDENCIES =	\
+	libglamo.a 			\
+	@KDRIVE_LOCAL_LIBS@
+
+relink:
+	rm -f $(bin_PROGRAMS) && make $(bin_PROGRAMS)
