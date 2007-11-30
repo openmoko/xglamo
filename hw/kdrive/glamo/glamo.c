@@ -27,9 +27,6 @@
 #include <kdrive-config.h>
 #endif
 #include "glamo.h"
-#if defined(USE_DRI) && defined(GLXEXT)
-#include "glamo_sarea.h"
-#endif
 
 static Bool
 GLAMOCardInit(KdCardInfo *card)
@@ -89,13 +86,6 @@ GLAMOCardInit(KdCardInfo *card)
 		return FALSE;
 	}
 
-#ifdef USE_DRI
-	/* We demand identification by busid, not driver name */
-	glamoc->drmFd = drmOpen(NULL, glamoc->busid);
-	if (glamoc->drmFd < 0)
-		ErrorF("Failed to open DRM, DRI disabled.\n");
-#endif /* USE_DRI */
-
 	card->driver = glamoc;
 
 	glamoc->is_3362 = TRUE;
@@ -122,10 +112,6 @@ static void
 GLAMOSetOffscreen (KdScreenInfo *screen)
 {
 	GLAMOCardInfo(screen);
-#if defined(USE_DRI) && defined(GLXEXT)
-	GLAMOScreenInfo *glamos = (GLAMOScreenInfo *)screen->driver;
-	int l;
-#endif
 	int screen_size;
 	char *mmio = glamoc->reg_base;
 
@@ -152,57 +138,7 @@ GLAMOSetOffscreen (KdScreenInfo *screen)
 	}
 
 	screen_size = screen->fb[0].byteStride * screen->height;
-
 	screen->off_screen_base = screen_size;
-
-#if defined(USE_DRI) && defined(GLXEXT)
-	/* Reserve a static area for the back buffer the same size as the
-	 * visible screen.  XXX: This would be better initialized in glamo_dri.c
-	 * when GLX is set up, but the offscreen memory manager's allocations
-	 * don't last through VT switches, while the kernel's understanding of
-	 * offscreen locations does.
-	 */
-	glamos->frontOffset = 0;
-	glamos->frontPitch = screen->fb[0].byteStride;
-
-	if (screen->off_screen_base + screen_size <= screen->memory_size) {
-		glamos->backOffset = screen->off_screen_base;
-		glamos->backPitch = screen->fb[0].byteStride;
-		screen->off_screen_base += screen_size;
-	}
-
-	/* Reserve the depth span for Rage 128 */
-	if (!glamoc->is_3362 && screen->off_screen_base +
-	    screen->fb[0].byteStride <= screen->memory_size) {
-		glamos->spanOffset = screen->off_screen_base;
-		screen->off_screen_base += screen->fb[0].byteStride;
-	}
-
-	/* Reserve the static depth buffer, which happens to be the same
-	 * bitsPerPixel as the screen.
-	 */
-	if (screen->off_screen_base + screen_size <= screen->memory_size) {
-		glamos->depthOffset = screen->off_screen_base;
-		glamos->depthPitch = screen->fb[0].byteStride;
-		screen->off_screen_base += screen_size;
-	}
-
-	/* Reserve approx. half of remaining offscreen memory for local
-	 * textures.  Round down to a whole number of texture regions.
-	 */
-	glamos->textureSize = (screen->memory_size - screen->off_screen_base) / 2;
-	l = GLAMOLog2(glamos->textureSize / GLAMO_NR_TEX_REGIONS);
-	if (l < GLAMO_LOG_TEX_GRANULARITY)
-		l = GLAMO_LOG_TEX_GRANULARITY;
-	glamos->textureSize = (glamos->textureSize >> l) << l;
-	if (glamos->textureSize >= 512 * 1024) {
-		glamos->textureOffset = screen->off_screen_base;
-		screen->off_screen_base += glamos->textureSize;
-	} else {
-		/* Minimum texture size is for 2 256x256x32bpp textures */
-		glamos->textureSize = 0;
-	}
-#endif /* USE_DRI && GLXEXT */
 }
 
 static Bool
@@ -413,9 +349,6 @@ static void
 GLAMODisable(ScreenPtr pScreen)
 {
 	KdScreenPriv(pScreen);
-#if defined(USE_DRI) && defined(GLXEXT)
-	GLAMOScreenInfo(pScreenPriv);
-#endif /* USE_DRI && GLXEXT */
 	GLAMOCardInfo(pScreenPriv);
 
 	GLAMOUnmapReg(pScreenPriv->card, glamoc);
