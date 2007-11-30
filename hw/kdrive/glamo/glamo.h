@@ -30,13 +30,7 @@
 #include <kdrive-config.h>
 #endif
 
-#ifdef KDRIVEFBDEV
 #include <fbdev.h>
-#endif
-#ifdef KDRIVEVESA
-#include <vesa.h>
-#endif
-
 #include "kxv.h"
 
 #define GLAMO_REG_BASE(c)		((c)->attr.address[0])
@@ -99,12 +93,7 @@ struct backend_funcs {
 
 typedef struct _GLAMOCardInfo {
 	union {
-#ifdef KDRIVEFBDEV
 		FbdevPriv fbdev;
-#endif
-#ifdef KDRIVEVESA
-		VesaCardPrivRec vesa;
-#endif
 	} backend_priv;
 	struct backend_funcs backend_funcs;
 
@@ -112,7 +101,6 @@ typedef struct _GLAMOCardInfo {
 	Bool is_3362;
 	CARD32 crtc_pitch;
 	CARD32 crtc2_pitch;
-	Bool use_fbdev, use_vesa;
 } GLAMOCardInfo;
 
 #define getGLAMOCardInfo(kd)	((GLAMOCardInfo *) ((kd)->card->driver))
@@ -155,12 +143,7 @@ typedef struct _dmaBuf {
 
 typedef struct _GLAMOScreenInfo {
 	union {
-#ifdef KDRIVEFBDEV
 		FbdevScrPriv fbdev;
-#endif
-#ifdef KDRIVEVESA
-		VesaScreenPrivRec vesa;
-#endif
 	} backend_priv;
 	KaaScreenInfoRec kaa;
 
