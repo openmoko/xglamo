@@ -26,6 +26,7 @@
 #ifdef HAVE_CONFIG_H
 #include <kdrive-config.h>
 #endif
+#include "glamo-log.h"
 #include "glamo.h"
 #include "glamo-regs.h"
 #include "glamo_dma.h"
@@ -90,44 +91,10 @@ GLAMOWaitMarker(ScreenPtr pScreen, int marker)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 
-	ENTER_DRAW(0);
+	GLAMO_LOG("enter");
 	GLAMOWaitIdle(glamos);
-	LEAVE_DRAW(0);
+	GLAMO_LOG("leave");
 }
-
-#if GLAMO_TRACE_DRAW
-void
-GLAMOEnterDraw (PixmapPtr pPix, const char *function)
-{
-    if (pPix != NULL) {
-	KdScreenPriv(pPix->drawable.pScreen);
-	CARD32 offset;
-
-	offset = ((CARD8 *)pPix->devPrivate.ptr -
-		  pScreenPriv->screen->memory_base);
-
-	ErrorF ("Enter %s 0x%x (%dx%dx%d/%d)\n", function, (unsigned int) offset,
-	    pPix->drawable.width, pPix->drawable.height, pPix->drawable.depth,
-	    (unsigned int) pPix->drawable.bitsPerPixel);
-    } else
-	ErrorF ("Enter %s\n", function);
-}
-
-void
-GLAMOLeaveDraw (PixmapPtr pPix, const char *function)
-{
-    if (pPix != NULL) {
-	KdScreenPriv(pPix->drawable.pScreen);
-	CARD32 offset;
-
-	offset = ((CARD8 *)pPix->devPrivate.ptr -
-		  pScreenPriv->screen->memory_base);
-
-	ErrorF ("Leave %s 0x%x\n", function, (unsigned int) offset);
-    } else
-	ErrorF ("Leave %s\n", function);
-}
-#endif
 
 static Bool
 GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
@@ -137,6 +104,7 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 	CARD32 offset, pitch;
 	FbBits mask;
 	RING_LOCALS;
+        return FALSE;
 
 	if (pPix->drawable.bitsPerPixel != 16)
 		GLAMO_FALLBACK(("Only 16bpp is supported\n"));
@@ -152,7 +120,7 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 			pScreenPriv->screen->memory_base);
 	pitch = pPix->devKind;
 
-	ENTER_DRAW(pPix);
+	GLAMO_LOG("enter");
 
 	BEGIN_DMA(12);
 	OUT_REG(GLAMO_REG_2D_DST_ADDRL, offset & 0xffff);
@@ -163,7 +131,7 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 	OUT_REG(GLAMO_REG_2D_COMMAND2, settings);
 	END_DMA();
 
-	LEAVE_DRAW(pPix);
+	GLAMO_LOG("leave");
 
 	return TRUE;
 }
@@ -171,7 +139,7 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 static void
 GLAMOSolid(int x1, int y1, int x2, int y2)
 {
-	ENTER_DRAW(0);
+	GLAMO_LOG("enter");
 	GLAMOScreenInfo *glamos = accel_glamos;
 	RING_LOCALS;
 
@@ -184,14 +152,12 @@ GLAMOSolid(int x1, int y1, int x2, int y2)
 	OUT_REG(GLAMO_REG_2D_ID1, 0);
 	OUT_REG(GLAMO_REG_2D_ID2, 0);
 	END_DMA();
-	LEAVE_DRAW(0);
+	GLAMO_LOG("leave");
 }
 
 static void
 GLAMODoneSolid(void)
 {
-	ENTER_DRAW(0);
-	LEAVE_DRAW(0);
 }
 
 static Bool
@@ -203,6 +169,8 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 	CARD32 dst_offset, dst_pitch;
 	FbBits mask;
 	RING_LOCALS;
+
+	GLAMO_LOG("enter");
 
 	if (pSrc->drawable.bitsPerPixel != 16 ||
 	    pDst->drawable.bitsPerPixel != 16)
@@ -224,8 +192,6 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 
 	settings = GLAMOBltRop[alu] << 8;
 
-	ENTER_DRAW (pDst);
-
 	BEGIN_DMA(16);
 
 	OUT_REG(GLAMO_REG_2D_SRC_ADDRL, src_offset & 0xffff);
@@ -241,7 +207,7 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 
 	END_DMA();
 
-	LEAVE_DRAW(pDst);
+	GLAMO_LOG("leave");
 
 	return TRUE;
 }
@@ -268,8 +234,8 @@ GLAMOCopy(int srcX, int srcY, int dstX, int dstY, int w, int h)
 static void
 GLAMODoneCopy(void)
 {
-	ENTER_DRAW(0);
-	LEAVE_DRAW(0);
+	GLAMO_LOG("enter");
+	GLAMO_LOG("leave");
 }
 
 static Bool
@@ -279,6 +245,7 @@ GLAMOUploadToScreen(PixmapPtr pDst, char *src, int src_pitch)
 	CARD8 *dst_offset;
 	int dst_pitch;
 
+        GLAMO_LOG("enter");
 	dst_offset = (CARD8 *)pDst->devPrivate.ptr;
 	dst_pitch = pDst->devKind;
 	width = pDst->drawable.width;
@@ -294,82 +261,8 @@ GLAMOUploadToScreen(PixmapPtr pDst, char *src, int src_pitch)
 		src += src_pitch;
 	}
 
-	ErrorF("hostdata upload %d,%d %dbpp\n", width, height, bpp);
-
 	return TRUE;
 }
-
-
-#if 0
-static Bool
-GLAMOUploadToScratch(PixmapPtr pSrc, PixmapPtr pDst)
-{
-	KdScreenPriv(pSrc->drawable.pScreen);
-	GLAMOCardInfo(pScreenPriv);
-	GLAMOScreenInfo(pScreenPriv);
-	int dst_pitch, src_pitch, w, i, size, bytes;
-	unsigned char *dst, *src;
-	RING_LOCALS;
-
-	ENTER_DRAW(pSrc);
-	/* Align width to log 2, useful for R128 composite.  This should be a
-	 * KAA flag we check for (and supported in kaa.c in general) since many
-	 * older bits of hardware are going to want POT pitches.
-	 */
-	w = pSrc->drawable.width;
-	if (glamos->kaa.flags & KAA_OFFSCREEN_ALIGN_POT)
-		w = 1 << (GLAMOLog2(w - 1) + 1);
-	dst_pitch = (w * pSrc->drawable.bitsPerPixel / 8 +
-	    glamos->kaa.pitchAlign - 1) & ~(glamos->kaa.pitchAlign - 1);
-
-	size = dst_pitch * pSrc->drawable.height;
-	if (size > glamos->scratch_area->size)
-		GLAMO_FALLBACK(("Pixmap too large for scratch (%d,%d)\n",
-		    pSrc->drawable.width, pSrc->drawable.height));
-
-	glamos->scratch_next = (glamos->scratch_next + glamos->kaa.offsetAlign - 1) &
-	    ~(glamos->kaa.offsetAlign - 1);
-	if (glamos->scratch_next + size > glamos->scratch_area->offset +
-	    glamos->scratch_area->size) {
-		/* Only sync when we've used all of the scratch area. */
-		kaaWaitSync(pSrc->drawable.pScreen);
-		glamos->scratch_next = glamos->scratch_area->offset;
-	}
-	memcpy(pDst, pSrc, sizeof(*pDst));
-	pDst->devKind = dst_pitch;
-	pDst->devPrivate.ptr = pScreenPriv->screen->memory_base +
-	    glamos->scratch_next;
-	glamos->scratch_next += size;
-
-	src = pSrc->devPrivate.ptr;
-	src_pitch = pSrc->devKind;
-	dst = pDst->devPrivate.ptr;
-	bytes = src_pitch < dst_pitch ? src_pitch : dst_pitch;
-
-	i = pSrc->drawable.height;
-	while (i--) {
-		memcpy(dst, src, bytes);
-		dst += dst_pitch;
-		src += src_pitch;
-	}
-
-	/* Flush the pixel cache */
-	if (glamoc->is_3362) {
-		BEGIN_DMA(4);
-		OUT_REG(RADEON_REG_RB3D_DSTCACHE_CTLSTAT,
-		    RADEON_RB3D_DC_FLUSH_ALL);
-		OUT_REG(GLAMO_REG_WAIT_UNTIL, RADEON_WAIT_HOST_IDLECLEAN);
-		END_DMA();
-	} else {
-		BEGIN_DMA(2);
-		OUT_REG(R128_REG_PC_GUI_CTLSTAT, R128_PC_FLUSH_ALL);
-		END_DMA();
-	}
-
-	LEAVE_DRAW(pSrc);
-	return TRUE;
-}
-#endif
 
 static void
 GLAMOBlockHandler(pointer blockData, OSTimePtr timeout, pointer readmask)
