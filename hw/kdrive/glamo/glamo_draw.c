@@ -295,11 +295,6 @@ GLAMODrawInit(ScreenPtr pScreen)
 	RegisterBlockAndWakeupHandlers(GLAMOBlockHandler, GLAMOWakeupHandler,
 	    pScreen);
 
-	glamos->using_dri = FALSE;
-#ifdef USE_DRI
-	glamos->using_dri = GLAMODRIScreenInit(pScreen);
-#endif /* USE_DRI */
-
 	memset(&glamos->kaa, 0, sizeof(KaaScreenInfoRec));
 	glamos->kaa.waitMarker = GLAMOWaitMarker;
 	glamos->kaa.PrepareSolid = GLAMOPrepareSolid;
@@ -356,20 +351,6 @@ GLAMODrawEnable(ScreenPtr pScreen)
 	glamos->kaa.UploadToScreen = NULL;
 	glamos->kaa.UploadToScratch = NULL;
 
-#ifdef USE_DRI
-	if (glamos->using_dri) {
-		if (!glamoc->is_3362) {
-			/*glamos->kaa.PrepareTrapezoids = R128PrepareTrapezoids;
-			glamos->kaa.Trapezoids = R128Trapezoids;
-			glamos->kaa.DoneTrapezoids = R128DoneTrapezoids;*/
-		} else if (glamoc->is_r100 || glamoc->is_r200) {
-			glamos->kaa.PrepareTrapezoids = RadeonPrepareTrapezoids;
-			glamos->kaa.Trapezoids = RadeonTrapezoids;
-			glamos->kaa.DoneTrapezoids = RadeonDoneTrapezoids;
-		}
-	}
-#endif /* USE_DRI */
-
 	glamos->kaa.UploadToScreen = GLAMOUploadToScreen;
 
 	/* Reserve a scratch area.  It'll be used for storing glyph data during
@@ -398,15 +379,6 @@ GLAMODrawDisable(ScreenPtr pScreen)
 void
 GLAMODrawFini(ScreenPtr pScreen)
 {
-#ifdef USE_DRI
-	KdScreenPriv(pScreen);
-	GLAMOScreenInfo(pScreenPriv);
-	if (glamos->using_dri) {
-		GLAMODRICloseScreen(pScreen);
-		glamos->using_dri = FALSE;
-	}
-#endif /* USE_DRI */
-
 	RemoveBlockAndWakeupHandlers(GLAMOBlockHandler, GLAMOWakeupHandler,
 	    pScreen);
 
