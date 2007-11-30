@@ -38,9 +38,7 @@ GLAMOCardInit(KdCardInfo *card)
 	if (glamoc == NULL)
 		return FALSE;
 
-#ifdef KDRIVEFBDEV
 	if (!initialized && fbdevInitialize(card, &glamoc->backend_priv.fbdev)) {
-		glamoc->use_fbdev = TRUE;
 		initialized = TRUE;
 		glamoc->backend_funcs.cardfini = fbdevCardFini;
 		glamoc->backend_funcs.scrfini = fbdevScreenFini;
@@ -58,29 +56,6 @@ GLAMOCardInit(KdCardInfo *card)
 		glamoc->backend_funcs.randrSetConfig = fbdevRandRSetConfig;
 #endif
 	}
-#endif
-#ifdef KDRIVEVESA
-	if (!initialized && vesaInitialize(card, &glamoc->backend_priv.vesa)) {
-		glamoc->use_vesa = TRUE;
-		initialized = TRUE;
-		glamoc->backend_funcs.cardfini = vesaCardFini;
-		glamoc->backend_funcs.scrfini = vesaScreenFini;
-		glamoc->backend_funcs.initScreen = vesaInitScreen;
-		glamoc->backend_funcs.finishInitScreen = vesaFinishInitScreen;
-		glamoc->backend_funcs.createRes = vesaCreateResources;
-		glamoc->backend_funcs.preserve = vesaPreserve;
-		glamoc->backend_funcs.restore = vesaRestore;
-		glamoc->backend_funcs.dpms = vesaDPMS;
-		glamoc->backend_funcs.enable = vesaEnable;
-		glamoc->backend_funcs.disable = vesaDisable;
-		glamoc->backend_funcs.getColors = vesaGetColors;
-		glamoc->backend_funcs.putColors = vesaPutColors;
-#ifdef RANDR
-		glamoc->backend_funcs.randrSetConfig = vesaRandRSetConfig;
-#endif
-	}
-#endif
-
 	if (!initialized || !GLAMOMapReg(card, glamoc)) {
 		xfree(glamoc);
 		return FALSE;
@@ -158,18 +133,8 @@ GLAMOScreenInit(KdScreenInfo *screen)
 
 	if (screen->fb[0].depth == 0)
 		screen->fb[0].depth = 16;
-#ifdef KDRIVEFBDEV
-	if (glamoc->use_fbdev) {
-		success = fbdevScreenInitialize(screen,
-						&glamos->backend_priv.fbdev);
-	}
-#endif
-#ifdef KDRIVEVESA
-	if (glamoc->use_vesa) {
-		success = vesaScreenInitialize(screen,
-					       &glamos->backend_priv.vesa);
-	}
-#endif
+
+	success = fbdevScreenInitialize(screen, &glamos->backend_priv.fbdev);
 
 	if (!success) {
 		screen->driver = NULL;
