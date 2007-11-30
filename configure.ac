@@ -1988,6 +1988,7 @@ AM_CONDITIONAL(TSLIB, [test "x$HAVE_TSLIB" = xyes])
 AM_CONDITIONAL(H3600_TS, false)
 AM_CONDITIONAL(KDRIVEVESA, [test "x$KDRIVEVESA" = xyes])
 AM_CONDITIONAL(KDRIVEFBDEV, [test "x$XFBDEV" = xyes])
+AM_CONDITIONAL(KDRIVEGLAMO, [test x"$ac_cv_header_sys_vm86_h" = xyes -o x"$ac_cv_header_linux_fb_h" = xyes])
 AM_CONDITIONAL(XSDLSERVER, [test x"$XSDL" = xyes])
 AM_CONDITIONAL(XEPHYR, [test "x$KDRIVE" = xyes && test "x$XEPHYR" = xyes])
 AM_CONDITIONAL(BUILD_KDRIVEFBDEVLIB, [test "x$KDRIVE" = xyes && test "x$KDRIVEFBDEVLIB" = xyes])
@@ -2205,6 +2206,7 @@ hw/kdrive/ati/Makefile
 hw/kdrive/chips/Makefile
 hw/kdrive/ephyr/Makefile
 hw/kdrive/epson/Makefile
+hw/kdrive/glamo/Makefile
 hw/kdrive/fake/Makefile
 hw/kdrive/fbdev/Makefile
 hw/kdrive/i810/Makefile
