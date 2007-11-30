@@ -39,18 +39,6 @@
 
 #include "kxv.h"
 
-#undef XF86DRI
-#ifdef XF86DRI
-#define USE_DRI
-#include "xf86drm.h"
-#include "dri.h"
-#ifdef GLXEXT
-#include "GL/glxint.h"
-#include "GL/glxtokens.h"
-#include "glamo_dripriv.h"
-#endif
-#endif
-
 #define GLAMO_REG_BASE(c)		((c)->attr.address[0])
 #define GLAMO_REG_SIZE(c)		(0x2400)
 
@@ -124,9 +112,6 @@ typedef struct _GLAMOCardInfo {
 	Bool is_3362;
 	CARD32 crtc_pitch;
 	CARD32 crtc2_pitch;
-#ifdef USE_DRI
-	int drmFd;
-#endif /* USE_DRI */
 	Bool use_fbdev, use_vesa;
 } GLAMOCardInfo;
 
@@ -166,9 +151,6 @@ typedef struct _dmaBuf {
 	int size;
 	int used;
 	void *address;
-#ifdef USE_DRI
-	drmBufPtr drmBuf;
-#endif
 } dmaBuf;
 
 typedef struct _GLAMOScreenInfo {
@@ -194,8 +176,6 @@ typedef struct _GLAMOScreenInfo {
 	KdVideoAdaptorPtr pAdaptor;
 	int		num_texture_ports;
 
-	Bool		using_dri;	/* If we use the DRM for DMA. */
-
 	KdOffscreenArea *dma_space;	/* For "DMA" from framebuffer. */
 	CARD16		*ring_addr;	/* Beginning of ring buffer. */
 	int		ring_write;	/* Index of write ptr in ring. */
@@ -204,76 +184,6 @@ typedef struct _GLAMOScreenInfo {
 
 	dmaBuf		*indirectBuffer;
 	int		indirectStart;
-
-#ifdef USE_DRI
-	Bool		dma_started;
-
-	drmSize         registerSize;
-	drmHandle       registerHandle;
-	drmHandle       fbHandle;
-
-	drmSize		gartSize;
-	drmHandle	agpMemHandle;		/* Handle from drmAgpAlloc */
-	unsigned long	gartOffset;
-	unsigned char	*AGP;			/* Map */
-	int		agpMode;
-	drmSize         pciSize;
-	drmHandle       pciMemHandle;
-
-	/* ring buffer data */
-	unsigned long	ringStart;		/* Offset into AGP space */
-	drmHandle	ringHandle;		/* Handle from drmAddMap */
-	drmSize		ringMapSize;		/* Size of map */
-	int		ringSize;		/* Size of ring (MB) */
-	unsigned char	*ring;			/* Map */
-
-	unsigned long	ringReadOffset;		/* Offset into AGP space */
-	drmHandle	ringReadPtrHandle;	/* Handle from drmAddMap */
-	drmSize		ringReadMapSize;	/* Size of map */
-	unsigned char	*ringReadPtr;		/* Map */
-
-	/* vertex/indirect buffer data */
-	unsigned long	bufStart;		/* Offset into AGP space */
-	drmHandle	bufHandle;		/* Handle from drmAddMap */
-	drmSize		bufMapSize;		/* Size of map */
-	int		bufSize;		/* Size of buffers (MB) */
-	unsigned char	*buf;			/* Map */
-	int		bufNumBufs;		/* Number of buffers */
-	drmBufMapPtr	buffers;		/* Buffer map */
-
-	/* AGP Texture data */
-	unsigned long	gartTexStart;		/* Offset into AGP space */
-	drmHandle	gartTexHandle;		/* Handle from drmAddMap */
-	drmSize		gartTexMapSize;		/* Size of map */
-	int		gartTexSize;		/* Size of AGP tex space (MB) */
-	unsigned char	*gartTex;		/* Map */
-	int		log2GARTTexGran;
-
-	int		DMAusecTimeout;   /* CCE timeout in usecs */
-
-	/* DRI screen private data */
-	int		frontOffset;
-	int		frontPitch;
-	int		backOffset;
-	int		backPitch;
-	int		depthOffset;
-	int		depthPitch;
-	int		spanOffset;
-	int		textureOffset;
-	int		textureSize;
-	int		log2TexGran;
-
-	int		irqEnabled;
-
-	int		serverContext;
-
-	DRIInfoPtr	pDRIInfo;
-#ifdef GLXEXT
-	int		numVisualConfigs;
-	__GLXvisualConfig *pVisualConfigs;
-	GLAMOConfigPrivPtr pVisualConfigsPriv;
-#endif /* GLXEXT */
-#endif /* USE_DRI */
 } GLAMOScreenInfo;
 
 #define getGLAMOScreenInfo(kd)	((GLAMOScreenInfo *) ((kd)->screen->driver))
@@ -329,31 +239,6 @@ GLAMODrawDisable(ScreenPtr pScreen);
 
 void
 GLAMODrawFini(ScreenPtr pScreen);
-
-/* glamo_dri.c */
-#ifdef USE_DRI
-Bool
-GLAMODRIScreenInit(ScreenPtr pScreen);
-
-void
-GLAMODRICloseScreen(ScreenPtr pScreen);
-
-void
-GLAMODRIDMAStart(GLAMOScreenInfo *glamos);
-
-void
-GLAMODRIDMAStop(GLAMOScreenInfo *glamos);
-
-void
-GLAMODRIDMAReset(GLAMOScreenInfo *glamos);
-
-void
-GLAMODRIDispatchIndirect(GLAMOScreenInfo *glamos, Bool discard);
-
-drmBufPtr
-GLAMODRIGetBuffer(GLAMOScreenInfo *glamos);
-
-#endif /* USE_DRI */
 
 /* glamo_cursor.c */
 Bool

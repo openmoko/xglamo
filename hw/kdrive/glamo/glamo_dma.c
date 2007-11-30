@@ -31,11 +31,6 @@
 #include "glamo_dma.h"
 #include "glamo_draw.h"
 
-#ifdef USE_DRI
-#include "radeon_common.h"
-#include "glamo_sarea.h"
-#endif /* USE_DRI */
-
 #ifndef NDEBUG
 static void
 GLAMODebugFifo(GLAMOScreenInfo *glamos)
@@ -168,26 +163,6 @@ GLAMOWaitIdle(GLAMOScreenInfo *glamos)
 	if (glamos->indirectBuffer != NULL)
 		GLAMOFlushIndirect(glamos, 0);
 
-#ifdef USE_DRI
-	if (glamos->using_dri) {
-		int ret = 0;
-		int cmd = (glamoc->is_3362 ? DRM_RADEON_CP_IDLE :
-		    DRM_R128_CCE_IDLE);
-		WHILE_NOT_TIMEOUT(2) {
-			ret = drmCommandNone(glamoc->drmFd, cmd);
-			if (ret != -EBUSY)
-				break;
-		}
-		if (TIMEDOUT()) {
-			GLAMODebugFifo(glamos);
-			FatalError("Timed out idling CCE (card hung)\n");
-		}
-		if (ret != 0)
-			ErrorF("Failed to idle DMA, returned %d\n", ret);
-		return;
-	}
-#endif
-
 	WHILE_NOT_TIMEOUT(.5) {
 		status = MMIO_IN16(mmio, GLAMO_REG_CQ_STATUS);
 		if ((status & (1 << 2)) && !(status & (1 << 8)))
@@ -213,20 +188,6 @@ GLAMOGetDMABuffer(GLAMOScreenInfo *glamos)
 	buf = (dmaBuf *)xalloc(sizeof(dmaBuf));
 	if (buf == NULL)
 		return NULL;
-
-#ifdef USE_DRI
-	if (glamos->using_dri) {
-		buf->drmBuf = GLAMODRIGetBuffer(glamos);
-		if (buf->drmBuf == NULL) {
-			xfree(buf);
-			return NULL;
-		}
-		buf->size = buf->drmBuf->total;
-		buf->used = buf->drmBuf->used;
-		buf->address = buf->drmBuf->address;
-		return buf;
-	}
-#endif /* USE_DRI */
 
 	buf->size = glamos->ring_len / 2;
 	buf->address = xalloc(buf->size);
@@ -290,25 +251,6 @@ GLAMOFlushIndirect(GLAMOScreenInfo *glamos, Bool discard)
 
 	if ((glamos->indirectStart == buf->used) && !discard)
 		return;
-
-#ifdef USE_DRI
-	if (glamos->using_dri) {
-		buf->drmBuf->used = buf->used;
-		GLAMODRIDispatchIndirect(glamos, discard);
-		if (discard) {
-			buf->drmBuf = GLAMODRIGetBuffer(glamos);
-			buf->size = buf->drmBuf->total;
-			buf->used = buf->drmBuf->used;
-			buf->address = buf->drmBuf->address;
-			glamos->indirectStart = 0;
-		} else {
-			/* Start on a double word boundary */
-			glamos->indirectStart = buf->used = (buf->used + 7) & ~7;
-		}
-		return;
-	}
-#endif /* USE_DRI */
-
 	GLAMODispatchIndirectDMA(glamos);
 
 	buf->used = 0;
@@ -367,13 +309,7 @@ GLAMODMASetup(ScreenPtr pScreen)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 
-#ifdef USE_DRI
-	if (glamos->using_dri)
-		GLAMODRIDMAStart(glamos);
-#endif /* USE_DRI */
-
-	if (!glamos->using_dri)
-		GLAMODMAInit(pScreen);
+	GLAMODMAInit(pScreen);
 
 	glamos->indirectBuffer = GLAMOGetDMABuffer(glamos);
 	if (glamos->indirectBuffer == FALSE)
@@ -387,11 +323,6 @@ GLAMODMATeardown(ScreenPtr pScreen)
 	GLAMOScreenInfo(pScreenPriv);
 
 	GLAMOWaitIdle(glamos);
-
-#ifdef USE_DRI
-	if (glamos->using_dri)
-		GLAMODRIDMAStop(glamos);
-#endif /* USE_DRI */
 
 	xfree(glamos->indirectBuffer->address);
 	xfree(glamos->indirectBuffer);
