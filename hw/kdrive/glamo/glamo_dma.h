@@ -29,20 +29,6 @@
 #define CCE_DEBUG 1
 
 #if !CCE_DEBUG
-#define DMA_PACKET0(reg, count)						\
-	(reg)
-#else
-#define DMA_PACKET0(reg, count)						\
-	(__packet0count = (count), __reg = (reg),			\
-	(reg))
-#endif
-#define DMA_PACKET1(reg1, reg2)						\
-	(GLAMO_CCE_PACKET1 |						\
-	(((reg2) >> 2) << GLAMO_CCE_PACKET1_REG_2_SHIFT) |  ((reg1) >> 2))
-#define DMA_PACKET3(type, count)					\
-	((type) | (((count) - 1) << 16))
-
-#if !CCE_DEBUG
 
 #define RING_LOCALS	CARD16 *__head; int __count
 #define BEGIN_DMA(n)							\
@@ -85,28 +71,33 @@ do {									\
 
 #endif
 
-#define OUT_RING(val) do {						\
-	__head[__count++] = (val);					\
+#define OUT_PAIR(v1, v2)                                               \
+do {                                                                   \
+       __head[__count++] = (v1);                                       \
+       __head[__count++] = (v2);                                       \
 } while (0)
 
-#define OUT_RING_REG(reg, val) do {					\
-	if (__reg != reg)						\
-		FatalError("unexpected reg (0x%x vs 0x%x) at %s:%d\n",	\
-		    reg, __reg, __FILE__, __LINE__);			\
-	if (__packet0count-- <= 0)					\
-		FatalError("overrun of packet0 at %s:%d\n",		\
-		    __FILE__, __LINE__);				\
-	__head[__count++] = (val);					\
-	__reg += 4;							\
+#define OUT_BURST_REG(reg, val) do {                                   \
+       if (__reg != reg)                                               \
+               FatalError("unexpected reg (0x%x vs 0x%x) at %s:%d\n",  \
+                   reg, __reg, __FILE__, __LINE__);                    \
+       if (__packet0count-- <= 0)                                      \
+               FatalError("overrun of packet0 at %s:%d\n",             \
+                   __FILE__, __LINE__);                                \
+       __head[__count++] = (val);                                      \
+       __reg += 2;                                                     \
 } while (0)
 
-#define OUT_RING_F(x) OUT_RING(GET_FLOAT_BITS(x))
+#define OUT_REG(reg, val)                                              \
+       OUT_PAIR(reg, val)
 
-#define OUT_REG(reg, val)						\
-do {									\
-	OUT_RING(DMA_PACKET0(reg, 1));					\
-	OUT_RING(val);							\
+#define OUT_BURST(reg, n)                                              \
+do {                                                                   \
+       OUT_PAIR((1 << 15) | reg, n);                                   \
+       __reg = reg;                                                    \
+       __packet0count = n;                                             \
 } while (0)
+
 
 #define TIMEOUT_LOCALS struct timeval _target, _curtime
 
@@ -142,9 +133,10 @@ void
 GLAMODMATeardown(ScreenPtr pScreen);
 
 enum glamo_engine {
+	GLAMO_ENGINE_CMDQ,
 	GLAMO_ENGINE_ISP,
-	GLAMO_ENGINE_CQ,
 	GLAMO_ENGINE_2D,
+	GLAMO_ENGINE_ALL /* for GLAMOEngineWait */
 };
 
 void
@@ -156,4 +148,11 @@ GLAMOEngineDisable(ScreenPtr pScreen, enum glamo_engine engine);
 void
 GLAMOEngineReset(ScreenPtr pScreen, enum glamo_engine engine);
 
+int
+GLAMOEngineBusy(ScreenPtr pScreen, enum glamo_engine engine);
+
+void
+GLAMOEngineWait(ScreenPtr pScreen, enum glamo_engine engine);
+
 #endif /* _GLAMO_DMA_H_ */
+

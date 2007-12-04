@@ -39,16 +39,16 @@ GLAMODebugFifo(GLAMOScreenInfo *glamos)
 	char *mmio = glamoc->reg_base;
 	CARD32 offset;
 
-	ErrorF("GLAMO_REG_CQ_STATUS: 0x%04x\n",
-	    MMIO_IN16(mmio, GLAMO_REG_CQ_STATUS));
+	ErrorF("GLAMO_REG_CMDQ_STATUS: 0x%04x\n",
+	    MMIO_IN16(mmio, GLAMO_REG_CMDQ_STATUS));
 
-	offset = MMIO_IN16(mmio, GLAMO_REG_CQ_WRITE_ADDRL);
-	offset |= (MMIO_IN16(mmio, GLAMO_REG_CQ_WRITE_ADDRH) << 16) & 0x7;
-	ErrorF("GLAMO_REG_CQ_WRITE_ADDR: 0x%08x\n", (unsigned int) offset);
+	offset = MMIO_IN16(mmio, GLAMO_REG_CMDQ_WRITE_ADDRL);
+	offset |= (MMIO_IN16(mmio, GLAMO_REG_CMDQ_WRITE_ADDRH) << 16) & 0x7;
+	ErrorF("GLAMO_REG_CMDQ_WRITE_ADDR: 0x%08x\n", (unsigned int) offset);
 
-	offset = MMIO_IN16(mmio, GLAMO_REG_CQ_READ_ADDRL);
-	offset |= (MMIO_IN16(mmio, GLAMO_REG_CQ_READ_ADDRH) << 16) & 0x7;
-	ErrorF("GLAMO_REG_CQ_READ_ADDR: 0x%08x\n", (unsigned int) offset);
+	offset = MMIO_IN16(mmio, GLAMO_REG_CMDQ_READ_ADDRL);
+	offset |= (MMIO_IN16(mmio, GLAMO_REG_CMDQ_READ_ADDRH) << 16) & 0x7;
+	ErrorF("GLAMO_REG_CMDQ_READ_ADDR: 0x%08x\n", (unsigned int) offset);
 }
 #endif
 
@@ -65,24 +65,27 @@ GLAMOEngineReset(ScreenPtr pScreen, enum glamo_engine engine)
 		return;
 
 	switch (engine) {
-	case GLAMO_ENGINE_ISP:
-		reg = GLAMO_REG_CLOCK_ISP;
-		mask = GLAMO_CLOCK_ISP2_RESET;
-		break;
-	case GLAMO_ENGINE_CQ:
-		reg = GLAMO_REG_CLOCK_2D;
-		mask = GLAMO_CLOCK_2D_CQ_RESET;
-		break;
-	case GLAMO_ENGINE_2D:
-		reg = GLAMO_REG_CLOCK_2D;
-		mask = GLAMO_CLOCK_2D_RESET;
-		break;
+		case GLAMO_ENGINE_CMDQ:
+			reg = GLAMO_REG_CLOCK_2D;
+			mask = GLAMO_CLOCK_2D_CMDQ_RESET;
+			break;
+		case GLAMO_ENGINE_ISP:
+			reg = GLAMO_REG_CLOCK_ISP;
+			mask = GLAMO_CLOCK_ISP2_RESET;
+			break;
+		case GLAMO_ENGINE_2D:
+			reg = GLAMO_REG_CLOCK_2D;
+			mask = GLAMO_CLOCK_2D_RESET;
+			break;
+		default:
+			return;
+			break;
 	}
-
 	MMIOSetBitMask(mmio, reg, mask, 0xffff);
 	usleep(1000);
 	MMIOSetBitMask(mmio, reg, mask, 0);
 	usleep(1000);
+
 }
 
 void
@@ -94,7 +97,50 @@ GLAMOEngineDisable(ScreenPtr pScreen, enum glamo_engine engine)
 
 	if (!mmio)
 		return;
-
+	switch (engine) {
+		case GLAMO_ENGINE_CMDQ:
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_2D,
+					GLAMO_CLOCK_2D_EN_M6CLK,
+					0);
+			MMIOSetBitMask(mmio, GLAMO_REG_HOSTBUS(2),
+					GLAMO_HOSTBUS2_MMIO_EN_CMDQ,
+					0);
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_1,
+					GLAMO_CLOCK_GEN51_EN_DIV_MCLK,
+					0);
+			break;
+		case GLAMO_ENGINE_ISP:
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_ISP,
+					GLAMO_CLOCK_ISP_EN_M2CLK |
+					GLAMO_CLOCK_ISP_EN_I1CLK,
+					0);
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_2,
+					GLAMO_CLOCK_GEN52_EN_DIV_ICLK,
+					0);
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_1,
+					GLAMO_CLOCK_GEN51_EN_DIV_JCLK,
+					0);
+			MMIOSetBitMask(mmio, GLAMO_REG_HOSTBUS(2),
+					GLAMO_HOSTBUS2_MMIO_EN_ISP,
+					0);
+			break;
+		case GLAMO_ENGINE_2D:
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_2D,
+					GLAMO_CLOCK_2D_EN_M7CLK |
+					GLAMO_CLOCK_2D_EN_GCLK |
+					GLAMO_CLOCK_2D_DG_M7CLK |
+					GLAMO_CLOCK_2D_DG_GCLK,
+					0);
+			MMIOSetBitMask(mmio, GLAMO_REG_HOSTBUS(2),
+					GLAMO_HOSTBUS2_MMIO_EN_2D,
+					0);
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_1,
+					GLAMO_CLOCK_GEN51_EN_DIV_GCLK,
+					0);
+			break;
+		default:
+			break;
+	}
 	return;
 }
 
@@ -109,76 +155,142 @@ GLAMOEngineEnable(ScreenPtr pScreen, enum glamo_engine engine)
 		return;
 
 	switch (engine) {
-	case GLAMO_ENGINE_ISP:
-		MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_ISP,
-			       GLAMO_CLOCK_ISP_EN_M2CLK |
-			       GLAMO_CLOCK_ISP_EN_I1CLK,
-			       0xffff);
-		MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_2,
-			       GLAMO_CLOCK_GEN52_EN_DIV_ICLK,
-			       0xffff);
-		MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_1,
-			       GLAMO_CLOCK_GEN51_EN_DIV_JCLK,
-			       0xffff);
-		MMIOSetBitMask(mmio, GLAMO_REG_HOSTBUS(2),
-			       GLAMO_HOSTBUS2_MMIO_EN_ISP,
-			       0xffff);
-		break;
-	case GLAMO_ENGINE_CQ:
-		MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_2D,
-			       GLAMO_CLOCK_2D_EN_M6CLK,
-			       0xffff);
-		MMIOSetBitMask(mmio, GLAMO_REG_HOSTBUS(2),
-			       GLAMO_HOSTBUS2_MMIO_EN_CQ,
-			       0xffff);
-		MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_1,
-			       GLAMO_CLOCK_GEN51_EN_DIV_MCLK,
-			       0xffff);
-		break;
-	case GLAMO_ENGINE_2D:
-		MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_2D,
-				GLAMO_CLOCK_2D_EN_M7CLK |
-				GLAMO_CLOCK_2D_EN_GCLK |
-				GLAMO_CLOCK_2D_DG_M7CLK |
-				GLAMO_CLOCK_2D_DG_GCLK,
-				0xffff);
-		MMIOSetBitMask(mmio, GLAMO_REG_HOSTBUS(2),
-			       GLAMO_HOSTBUS2_MMIO_EN_2D,
-			       0xffff);
-		MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_1,
-			       GLAMO_CLOCK_GEN51_EN_DIV_GCLK,
-			       0xffff);
-		break;
+		case GLAMO_ENGINE_CMDQ:
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_2D,
+					GLAMO_CLOCK_2D_EN_M6CLK,
+					0xffff);
+			MMIOSetBitMask(mmio, GLAMO_REG_HOSTBUS(2),
+					GLAMO_HOSTBUS2_MMIO_EN_CMDQ,
+					0xffff);
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_1,
+					GLAMO_CLOCK_GEN51_EN_DIV_MCLK,
+					0xffff);
+			break;
+		case GLAMO_ENGINE_ISP:
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_ISP,
+					GLAMO_CLOCK_ISP_EN_M2CLK |
+					GLAMO_CLOCK_ISP_EN_I1CLK,
+					0xffff);
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_2,
+					GLAMO_CLOCK_GEN52_EN_DIV_ICLK,
+					0xffff);
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_1,
+					GLAMO_CLOCK_GEN51_EN_DIV_JCLK,
+					0xffff);
+			MMIOSetBitMask(mmio, GLAMO_REG_HOSTBUS(2),
+					GLAMO_HOSTBUS2_MMIO_EN_ISP,
+					0xffff);
+			break;
+		case GLAMO_ENGINE_2D:
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_2D,
+					GLAMO_CLOCK_2D_EN_M7CLK |
+					GLAMO_CLOCK_2D_EN_GCLK |
+					GLAMO_CLOCK_2D_DG_M7CLK |
+					GLAMO_CLOCK_2D_DG_GCLK,
+					0xffff);
+			MMIOSetBitMask(mmio, GLAMO_REG_HOSTBUS(2),
+					GLAMO_HOSTBUS2_MMIO_EN_2D,
+					0xffff);
+			MMIOSetBitMask(mmio, GLAMO_REG_CLOCK_GEN5_1,
+					GLAMO_CLOCK_GEN51_EN_DIV_GCLK,
+					0xffff);
+			break;
+		default:
+			break;
 	}
 }
 
-void
-GLAMOWaitIdle(GLAMOScreenInfo *glamos)
+int
+GLAMOEngineBusy(ScreenPtr pScreen, enum glamo_engine engine)
 {
-	GLAMOCardInfo *glamoc = glamos->glamoc;
+	KdScreenPriv(pScreen);
+	GLAMOCardInfo(pScreenPriv);
+	GLAMOScreenInfo(pScreenPriv);
 	char *mmio = glamoc->reg_base;
-	CARD16 status;
-	TIMEOUT_LOCALS;
+	CARD16 status, mask, val;
+
+	if (!mmio)
+		return FALSE;
 
 	if (glamos->indirectBuffer != NULL)
 		GLAMOFlushIndirect(glamos, 0);
 
-	WHILE_NOT_TIMEOUT(.5) {
-		status = MMIO_IN16(mmio, GLAMO_REG_CQ_STATUS);
-		if ((status & (1 << 2)) && !(status & (1 << 8)))
+	switch (engine)
+	{
+		case GLAMO_ENGINE_CMDQ:
+			mask = 0x3;
+			val  = mask;
+			break;
+		case GLAMO_ENGINE_ISP:
+			mask = 0x3 | (1 << 8);
+			val  = 0x3;
+			break;
+		case GLAMO_ENGINE_2D:
+			mask = 0x3 | (1 << 4);
+			val  = 0x3;
+			break;
+		case GLAMO_ENGINE_ALL:
+		default:
+			mask = 1 << 2;
+			val  = mask;
+			break;
+	}
+
+	status = MMIO_IN16(mmio, GLAMO_REG_CMDQ_STATUS);
+
+	return !((status & mask) == val);
+}
+
+void
+GLAMOEngineWait(ScreenPtr pScreen, enum glamo_engine engine)
+{
+	KdScreenPriv(pScreen);
+	GLAMOCardInfo(pScreenPriv);
+	GLAMOScreenInfo(pScreenPriv);
+	char *mmio = glamoc->reg_base;
+	CARD16 status, mask, val;
+	TIMEOUT_LOCALS;
+
+	if (!mmio)
+		return;
+
+	if (glamos->indirectBuffer != NULL)
+		GLAMOFlushIndirect(glamos, 0);
+
+	switch (engine)
+	{
+		case GLAMO_ENGINE_CMDQ:
+			mask = 0x3;
+			val  = mask;
+			break;
+		case GLAMO_ENGINE_ISP:
+			mask = 0x3 | (1 << 8);
+			val  = 0x3;
+			break;
+		case GLAMO_ENGINE_2D:
+			mask = 0x3 | (1 << 4);
+			val  = 0x3;
+			break;
+		case GLAMO_ENGINE_ALL:
+		default:
+			mask = 1 << 2;
+			val  = mask;
+			break;
+	}
+
+	WHILE_NOT_TIMEOUT(5) {
+		status = MMIO_IN16(mmio, GLAMO_REG_CMDQ_STATUS);
+		if ((status & mask) == val)
 			break;
 	}
 	if (TIMEDOUT()) {
-		ErrorF("Timeout idling accelerator, resetting...\n");
-		GLAMOEngineReset(glamos->screen->pScreen, GLAMO_ENGINE_CQ);
+		ErrorF("Timeout idling accelerator (0x%x), resetting...\n",
+				status);
+		GLAMOEngineReset(glamos->screen->pScreen, GLAMO_ENGINE_CMDQ);
 		GLAMODrawSetup(glamos->screen->pScreen);
 	}
-
-#if DEBUG_FIFO
-	ErrorF("Idle?\n");
-	GLAMODebugFifo(glamos);
-#endif
 }
+
 
 dmaBuf *
 GLAMOGetDMABuffer(GLAMOScreenInfo *glamos)
@@ -225,22 +337,22 @@ GLAMODispatchIndirectDMA(GLAMOScreenInfo *glamos)
 		while (glamos->ring_write == glamos->ring_read)
 		{
 			glamos->ring_read =
-				MMIO_IN16(mmio, GLAMO_REG_CQ_READ_ADDRL);
+				MMIO_IN16(mmio, GLAMO_REG_CMDQ_READ_ADDRL);
 			glamos->ring_read |=
-				(MMIO_IN16(mmio, GLAMO_REG_CQ_READ_ADDRH) & 0x7) << 16;
+				(MMIO_IN16(mmio, GLAMO_REG_CMDQ_READ_ADDRH) & 0x7) << 16;
 		}
 
 		count--;
 	}
 	if (TIMEDOUT()) {
 		GLAMO_LOG_ERROR("Timeout submitting packets, resetting...\n");
-		GLAMOEngineReset(glamos->screen->pScreen, GLAMO_ENGINE_CQ);
+		GLAMOEngineReset(glamos->screen->pScreen, GLAMO_ENGINE_CMDQ);
 		GLAMODrawSetup(glamos->screen->pScreen);
 	}
 
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_WRITE_ADDRH,
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_WRITE_ADDRH,
 			 (glamos->ring_write >> 15) & 0x7);
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_WRITE_ADDRL,
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_WRITE_ADDRL,
 			 (glamos->ring_write <<  1) & 0xffff);
 }
 
@@ -282,20 +394,20 @@ GLAMODMAInit(ScreenPtr pScreen)
 	glamos->ring_addr[glamos->ring_len / 2] = 0x0;
 	glamos->ring_addr[glamos->ring_len / 2 + 1] = 0x0;
 
-	GLAMOEngineEnable(glamos->screen->pScreen, GLAMO_ENGINE_CQ);
-	GLAMOEngineReset(glamos->screen->pScreen, GLAMO_ENGINE_CQ);
+	GLAMOEngineEnable(glamos->screen->pScreen, GLAMO_ENGINE_CMDQ);
+	GLAMOEngineReset(glamos->screen->pScreen, GLAMO_ENGINE_CMDQ);
 
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_BASE_ADDRL,
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_BASE_ADDRL,
 			 glamos->dma_space->offset & 0xffff);
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_BASE_ADDRH,
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_BASE_ADDRH,
 			 (glamos->dma_space->offset >> 16) & 0x7f);
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_LEN, cq_len);
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_LEN, cq_len);
 
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_WRITE_ADDRH, 0);
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_WRITE_ADDRL, 0);
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_READ_ADDRH, 0);
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_READ_ADDRL, 0);
-	MMIO_OUT16(mmio, GLAMO_REG_CQ_CONTROL,
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_WRITE_ADDRH, 0);
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_WRITE_ADDRL, 0);
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_READ_ADDRH, 0);
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_READ_ADDRL, 0);
+	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_CONTROL,
 			 1 << 12 |
 			 5 << 8 |
 			 8 << 4);
@@ -322,7 +434,7 @@ GLAMODMATeardown(ScreenPtr pScreen)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 
-	GLAMOWaitIdle(glamos);
+	GLAMOEngineWait(pScreen, GLAMO_ENGINE_ALL);
 
 	xfree(glamos->indirectBuffer->address);
 	xfree(glamos->indirectBuffer);

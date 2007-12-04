@@ -92,7 +92,7 @@ GLAMOWaitMarker(ScreenPtr pScreen, int marker)
 	GLAMOScreenInfo(pScreenPriv);
 
 	GLAMO_LOG("enter");
-	GLAMOWaitIdle(glamos);
+	GLAMOEngineWait(pScreen, GLAMO_ENGINE_ALL);
 	GLAMO_LOG("leave");
 }
 
