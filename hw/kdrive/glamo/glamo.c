@@ -159,7 +159,6 @@ GLAMORandRSetConfig (ScreenPtr		pScreen,
 	GLAMOCardInfo *glamoc = screen->card->driver;
 	Bool ret;
 
-	GLAMODrawDisable (pScreen);
 	ret = glamoc->backend_funcs.randrSetConfig(pScreen, randr, rate, pSize);
 	GLAMOSetOffscreen (screen);
 	/*
@@ -172,8 +171,6 @@ GLAMORandRSetConfig (ScreenPtr		pScreen,
 					screen->fb[0].bitsPerPixel,
 					screen->fb[0].byteStride,
 					screen->fb[0].frameBuffer);
-
-	GLAMODrawEnable (pScreen);
 	return ret;
 }
 
@@ -278,8 +275,6 @@ GLAMORestore(KdCardInfo *card)
 {
 	GLAMOCardInfo *glamoc = card->driver;
 
-	GLAMOUnmapReg(card, glamoc);
-
 	glamoc->backend_funcs.restore(card);
 }
 
@@ -364,32 +359,16 @@ KdCardFuncs GLAMOFuncs = {
 	GLAMOScreenFini,	/* scrfini */
 	GLAMOCardFini,		/* cardfini */
 
-#if 0
-	GLAMOCursorInit,	/* initCursor */
-	GLAMOCursorEnable,	/* enableCursor */
-	GLAMOCursorDisable,	/* disableCursor */
-	GLAMOCursorFini,	/* finiCursor */
-	GLAMORecolorCursor,	/* recolorCursor */
-#else
 	0,			/* initCursor */
 	0,			/* enableCursor */
 	0,			/* disableCursor */
 	0,			/* finiCursor */
 	0,			/* recolorCursor */
-#endif
 
-
-#if 1
 	GLAMODrawInit,		/* initAccel */
 	GLAMODrawEnable,	/* enableAccel */
 	GLAMODrawDisable,	/* disableAccel */
 	GLAMODrawFini,		/* finiAccel */
-#else
-	0,			/* initAccel */
-	0,			/* enableAccel */
-	0,			/* disableAccel */
-	0,			/* finiAccel */
-#endif
 
 	GLAMOGetColors,		/* getColors */
 	GLAMOPutColors,		/* putColors */
