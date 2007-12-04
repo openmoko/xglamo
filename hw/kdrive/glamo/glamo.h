@@ -116,18 +116,20 @@ typedef struct _GLAMOCursor {
 	KdOffscreenArea *area;
 } GLAMOCursor;
 
+#define GLAMO_VIDEO_NUM_BUFS 2
 typedef struct _GLAMOPortPriv {
 	int brightness;
 	int saturation;
 	RegionRec clip;
-	CARD32 size;
-	KdOffscreenArea *off_screen;
 	DrawablePtr pDraw;
 	PixmapPtr pPixmap;
 
-	CARD32 src_offset;
-	CARD32 src_pitch;
-	CARD8 *src_addr;
+	int idx;
+	KdOffscreenArea *off_screen[GLAMO_VIDEO_NUM_BUFS];
+	CARD32 size[GLAMO_VIDEO_NUM_BUFS];
+	CARD32 src_offsets[GLAMO_VIDEO_NUM_BUFS][3];
+	CARD32 src_pitch1;
+	CARD32 src_pitch2;
 
 	int id;
 	int src_x1, src_y1, src_x2, src_y2;
@@ -245,6 +247,12 @@ GLAMOLog2(int val);
 /* glamo_video.c */
 Bool
 GLAMOInitVideo(ScreenPtr pScreen);
+
+Bool
+GLAMOVideoSetup(ScreenPtr pScreen);
+
+void
+GLAMOVideoTeardown(ScreenPtr pScreen);
 
 void
 GLAMOFiniVideo(ScreenPtr pScreen);

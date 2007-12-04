@@ -38,6 +38,9 @@
 
 #define MAKE_ATOM(a) MakeAtom(a, sizeof(a) - 1, TRUE)
 
+#define SYS_PITCH_ALIGN(w) (((w) + 3) & ~3)
+#define VID_PITCH_ALIGN(w) (((w) + 1) & ~1)
+
 static Atom xvBrightness, xvSaturation;
 
 #define IMAGE_MAX_WIDTH		2048
@@ -46,15 +49,18 @@ static Atom xvBrightness, xvSaturation;
 static void
 GLAMOStopVideo(KdScreenInfo *screen, pointer data, Bool exit)
 {
+	int i;
+
 	ScreenPtr pScreen = screen->pScreen;
 	GLAMOPortPrivPtr pPortPriv = (GLAMOPortPrivPtr)data;
 
 	REGION_EMPTY(screen->pScreen, &pPortPriv->clip);
 
-	if (pPortPriv->off_screen) {
-		KdOffscreenFree (pScreen, pPortPriv->off_screen);
-		pPortPriv->off_screen = 0;
-	}
+	for (i = 0; i < GLAMO_VIDEO_NUM_BUFS; i++)
+		if (pPortPriv->off_screen[i]) {
+			KdOffscreenFree (pScreen, pPortPriv->off_screen[i]);
+			pPortPriv->off_screen[i] = 0;
+		}
 }
 
 static int
@@ -154,12 +160,13 @@ GlamoDisplayVideo(KdScreenInfo *screen, GLAMOPortPrivPtr pPortPriv)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 	PixmapPtr pPixmap = pPortPriv->pPixmap;
-	CARD32 dst_offset, dst_pitch;
-	int dstxoff, dstyoff, srcDatatype;
+	CARD32 dst_offset, dst_pitch, *offsets;
+	int dstxoff, dstyoff;
 	RING_LOCALS;
 
 	BoxPtr pBox = REGION_RECTS(&pPortPriv->clip);
 	int nBox = REGION_NUM_RECTS(&pPortPriv->clip);
+	int en3;
 
 	dst_offset = ((CARD8 *)pPixmap->devPrivate.ptr -
 	    pScreenPriv->screen->memory_base);
@@ -173,85 +180,24 @@ GlamoDisplayVideo(KdScreenInfo *screen, GLAMOPortPrivPtr pPortPriv)
 	dstyoff = 0;
 #endif
 
-	BEGIN_DMA(14);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_11, 0x0167);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_21, 0x01c5);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_32, 0x00b6);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_33, 0x0058);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_RG, 0xb3 << 8 | 0x89);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_B, 0xe2);
-
-	/* TODO weight matrix */
-
-	OUT_REG(GLAMO_REG_ISP_PORT2_EN, GLAMO_ISP_PORT2_EN_DECODE);
-
-	END_DMA();
-
-	if (pPortPriv->id == FOURCC_UYVY)
-		srcDatatype = 3;
-	else
-		srcDatatype = 1;
+	en3 = GLAMO_ISP_EN3_PLANE_MODE |
+	      GLAMO_ISP_EN3_YUV_INPUT |
+	      GLAMO_ISP_EN3_YUV420;
+	en3 |= GLAMO_ISP_EN3_SCALE_IMPROVE;
 
 	BEGIN_DMA(8);
-#if 0
-	OUT_REG(GLAMO_REG_ISP_EN3, GLAMO_ISP_EN3_SCALE_IMPROVE |
-				   GLAMO_ISP_EN3_PLANE_MODE |
-				   GLAMO_ISP_EN3_YUV_INPUT |
-				   GLAMO_ISP_EN3_YUV420);
-	OUT_REG(GLAMO_REG_ISP_PORT1_DEC_EN, GLAMO_ISP_PORT1_EN_OUTPUT);
 
-	OUT_REG(GLAMO_REG_ISP_DEC_SCALEH, 1 << 11);
-	OUT_REG(GLAMO_REG_ISP_DEC_SCALEV, 1 << 11);
-
-	{
-		struct {
-			int src_block_y;
-			int src_block_x;
-			int src_block_h;
-			int src_block_w;
-			int jpeg_out_y;
-			int jpeg_out_x;
-			int fifo_full_cnt;
-			int in_length;
-			int fifo_data_cnt;
-			int in_height;
-		} onfly;
-
-		onfly.src_block_y = 32;
-		onfly.src_block_x = 32;
-		onfly.src_block_h = 36;
-		onfly.src_block_w = 35;
-		onfly.jpeg_out_y = 32;
-		onfly.jpeg_out_x = 32;
-		onfly.fifo_full_cnt = 0;
-		onfly.in_length = onfly.jpeg_out_x + 3;
-		onfly.fifo_data_cnt = onfly.src_block_w * onfly.src_block_h / 2;
-		onfly.in_height = onfly.jpeg_out_y + 2;
-
-		OUT_REG(GLAMO_REG_ISP_ONFLY_MODE1, onfly.src_block_y << 10 | onfly.src_block_x << 2);
-		OUT_REG(GLAMO_REG_ISP_ONFLY_MODE2, onfly.src_block_h << 8 | onfly.src_block_w);
-		OUT_REG(GLAMO_REG_ISP_ONFLY_MODE3, onfly.jpeg_out_y << 8 | onfly.jpeg_out_x);
-		OUT_REG(GLAMO_REG_ISP_ONFLY_MODE4, onfly.fifo_full_cnt << 8 | onfly.in_length);
-		OUT_REG(GLAMO_REG_ISP_ONFLY_MODE5, onfly.fifo_data_cnt << 6 | onfly.in_height);
-	}
-#endif
-
-	OUT_REG(GLAMO_REG_ISP_EN1,
-		GLAMO_ISP_EN1_YUV420 |
-		GLAMO_ISP_EN1_YUV_INPUT |
-		GLAMO_ISP_EN1_YUV_PACK |
-		((srcDatatype << 4) & 0x7));
-
-	OUT_REG(GLAMO_REG_ISP_PORT1_CAP_EN,
-		GLAMO_ISP_PORT1_EN_OUTPUT);
-
-	OUT_REG(GLAMO_REG_ISP_CAP_PITCH, pPortPriv->src_pitch);
-	OUT_REG(GLAMO_REG_ISP_PORT1_CAP_PITCH, dst_pitch);
+	OUT_REG(GLAMO_REG_ISP_EN3, en3);
+	OUT_REG(GLAMO_REG_ISP_DEC_PITCH_Y, pPortPriv->src_pitch1 & 0x1fff);
+	OUT_REG(GLAMO_REG_ISP_DEC_PITCH_UV, pPortPriv->src_pitch2 & 0x1fff);
+	OUT_REG(GLAMO_REG_ISP_PORT1_DEC_PITCH, dst_pitch & 0x1fff);
 
 	END_DMA();
 
+	offsets = pPortPriv->src_offsets[pPortPriv->idx];
+
 	while (nBox--) {
-		int srcX, srcY, dstX, dstY, srcw, srch, dstw, dsth;
+		int srcX, srcY, dstX, dstY, srcw, srch, dstw, dsth, scale;
 		CARD32 srcO, dstO;
 
 		dstX = pBox->x1 + dstxoff;
@@ -265,28 +211,43 @@ GlamoDisplayVideo(KdScreenInfo *screen, GLAMOPortPrivPtr pPortPriv)
 		srcw = pPortPriv->src_w - srcX; /* XXX */
 		srch = pPortPriv->src_h - srcY; /* XXX */
 
-		srcO = pPortPriv->src_offset + srcY * pPortPriv->src_pitch + srcX * 2;
+		GLAMOEngineWait(pScreen, GLAMO_ENGINE_ISP);
+
+		BEGIN_DMA(16);
+		srcO = offsets[0] + srcY * pPortPriv->src_pitch1 + srcX;
+		OUT_REG(GLAMO_REG_ISP_DEC_Y_ADDRL, srcO & 0xffff);
+		OUT_REG(GLAMO_REG_ISP_DEC_Y_ADDRH, (srcO >> 16) & 0x7f);
+
+		srcO = offsets[1] + srcY * pPortPriv->src_pitch2 + srcX;
+		OUT_REG(GLAMO_REG_ISP_DEC_U_ADDRL, srcO & 0xffff);
+		OUT_REG(GLAMO_REG_ISP_DEC_U_ADDRH, (srcO >> 16) & 0x7f);
+
+		srcO = offsets[2] + srcY * pPortPriv->src_pitch2 + srcX;
+		OUT_REG(GLAMO_REG_ISP_DEC_V_ADDRL, srcO & 0xffff);
+		OUT_REG(GLAMO_REG_ISP_DEC_V_ADDRH, (srcO >> 16) & 0x7f);
+
+		OUT_REG(GLAMO_REG_ISP_DEC_HEIGHT, srch & 0x1fff);
+		OUT_REG(GLAMO_REG_ISP_DEC_WIDTH, srcw & 0x1fff);
+		END_DMA();
+
+		BEGIN_DMA(16);
 		dstO = dst_offset + dstY * dst_pitch + dstX * 2;
+		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_0_ADDRL, dstO & 0xffff);
+		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_0_ADDRH, (dstO >> 16) & 0x7f);
 
-		BEGIN_DMA(18);
+		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_WIDTH, dstw & 0x1fff);
+		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_HEIGHT, dsth & 0x1fff);
 
-		OUT_REG(GLAMO_REG_ISP_CAP_0_ADDRL, srcO & 0xffff);
-		OUT_REG(GLAMO_REG_ISP_CAP_0_ADDRH, (srcO >> 16) & 0x7f);
-		OUT_REG(GLAMO_REG_ISP_CAP_HEIGHT, srch);
-		OUT_REG(GLAMO_REG_ISP_CAP_WIDTH, srcw);
+		scale = (srcw << 11) / dstw;
+		OUT_REG(GLAMO_REG_ISP_DEC_SCALEH, scale);
 
-		OUT_REG(GLAMO_REG_ISP_PORT1_CAP_0_ADDRL, dstO & 0xffff);
-		OUT_REG(GLAMO_REG_ISP_PORT1_CAP_0_ADDRH, (dstO >> 16) & 0x7f);
-		OUT_REG(GLAMO_REG_ISP_PORT1_CAP_WIDTH, dstw);
-		OUT_REG(GLAMO_REG_ISP_PORT1_CAP_HEIGHT, dsth);
+		scale = (srch << 11) / dsth;
+		OUT_REG(GLAMO_REG_ISP_DEC_SCALEV, scale);
 
-		/* fire */
 		OUT_REG(GLAMO_REG_ISP_EN1, GLAMO_ISP_EN1_FIRE_ISP);
 		OUT_REG(GLAMO_REG_ISP_EN1, 0);
 
 		END_DMA();
-
-		GLAMOWaitIdle(glamos);
 
 		pBox++;
 	}
@@ -303,9 +264,156 @@ GLAMOVideoSave(ScreenPtr pScreen, KdOffscreenArea *area)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 	GLAMOPortPrivPtr pPortPriv = glamos->pAdaptor->pPortPrivates[0].ptr;
+	int i;
 
-	if (pPortPriv->off_screen == area)
-		pPortPriv->off_screen = 0;
+	for (i = 0; i < GLAMO_VIDEO_NUM_BUFS; i++)
+		if (pPortPriv->off_screen[i] == area)
+		{
+			pPortPriv->off_screen[i] = 0;
+
+			break;
+		}
+}
+
+static int
+GLAMOUploadImage(KdScreenInfo *screen, DrawablePtr pDraw,
+		 GLAMOPortPrivPtr pPortPriv,
+		 short src_x, short src_y,
+		 short src_w, short src_h,
+		 int id,
+		 int randr,
+		 unsigned char *buf,
+		 short width, short height)
+{
+	CARD32 *offsets;
+	int srcPitch1, srcPitch2, dstPitch1, dstPitch2;
+	int src_x2, src_y2, size;
+	int idx;
+
+	src_x2 = src_x + src_w;
+	src_y2 = src_y + src_h;
+
+	src_x &= ~1;
+	src_y &= ~1;
+	src_w  = (src_x2 - src_x + 1) & ~1;
+	src_h  = (src_y2 - src_y + 1) & ~1;
+
+	switch (id) {
+	case FOURCC_YV12:
+	case FOURCC_I420:
+		srcPitch1 = SYS_PITCH_ALIGN(width);
+		srcPitch2 = SYS_PITCH_ALIGN(width / 2);
+		dstPitch1 = VID_PITCH_ALIGN(src_w);
+		dstPitch2 = VID_PITCH_ALIGN(src_w / 2);
+		size = (dstPitch1 + dstPitch2) * src_h;
+		break;
+	case FOURCC_UYVY:
+	case FOURCC_YUY2:
+	default:
+		srcPitch1 = width << 1;
+		srcPitch2 = 0;
+		dstPitch1 = src_w << 1;
+		dstPitch2 = 0;
+		size = dstPitch1 * src_h;
+		break;
+	}
+
+	idx = pPortPriv->idx;
+	//ErrorF("uploading to buffer %d\n", idx);
+
+	if (!pPortPriv->off_screen[idx] ||
+	    size > pPortPriv->off_screen[idx]->size) {
+		if (pPortPriv->off_screen[idx])
+			KdOffscreenFree(screen->pScreen,
+					pPortPriv->off_screen[idx]);
+
+		pPortPriv->off_screen[idx] =
+			KdOffscreenAlloc(screen->pScreen,
+					 size, VID_PITCH_ALIGN(1), TRUE,
+					 GLAMOVideoSave, pPortPriv);
+		if (!pPortPriv->off_screen[idx])
+			return BadAlloc;
+	}
+
+	if (pDraw->type == DRAWABLE_WINDOW)
+		pPortPriv->pPixmap =
+		    (*screen->pScreen->GetWindowPixmap)((WindowPtr)pDraw);
+	else
+		pPortPriv->pPixmap = (PixmapPtr)pDraw;
+
+	/* Migrate the pixmap to offscreen if necessary. */
+	if (!kaaPixmapIsOffscreen(pPortPriv->pPixmap))
+		kaaMoveInPixmap(pPortPriv->pPixmap);
+
+	if (!kaaPixmapIsOffscreen(pPortPriv->pPixmap))
+		return BadAlloc;
+
+	pPortPriv->pDraw = pDraw;
+
+	offsets = pPortPriv->src_offsets[idx];
+	offsets[0] = pPortPriv->off_screen[idx]->offset;
+	offsets[1] = offsets[0] + dstPitch1 * src_h;
+	offsets[2] = offsets[1] + dstPitch2 * src_h / 2;
+	pPortPriv->src_pitch1 = dstPitch1;
+	pPortPriv->src_pitch2 = dstPitch2;
+	pPortPriv->size[idx] = size;
+
+	/* copy data */
+	switch (id) {
+	case FOURCC_YV12:
+	case FOURCC_I420:
+		{
+			CARD8 *src1, *src2, *src3;
+			CARD8 *dst1, *dst2, *dst3;
+			int i;
+
+			src1 = buf + (src_y * srcPitch1) + src_x;
+			src2 = buf + (height * srcPitch1) +
+				(src_y * srcPitch2) + src_x / 2;
+			src3 = src2 + height * srcPitch2 / 2;
+
+			dst1 = (CARD8 *) (screen->memory_base + offsets[0]);
+
+			if (id == FOURCC_I420) {
+				dst2 = (CARD8 *) (screen->memory_base +
+						  offsets[1]);
+				dst3 = (CARD8 *) (screen->memory_base +
+						  offsets[2]);
+			} else {
+				dst2 = (CARD8 *) (screen->memory_base +
+						  offsets[2]);
+				dst3 = (CARD8 *) (screen->memory_base +
+						  offsets[1]);
+			}
+
+			for (i = 0; i < src_h; i++) {
+				memcpy(dst1, src1, src_w);
+				src1 += srcPitch1;
+				dst1 += dstPitch1;
+
+				if (!(i & 1)) {
+					memcpy(dst2, src2, src_w / 2);
+					memcpy(dst3, src3, src_w / 2);
+
+					src2 += srcPitch2;
+					dst2 += dstPitch2;
+					src3 += srcPitch2;
+					dst3 += dstPitch2;
+				}
+			}
+		}
+		break;
+	case FOURCC_UYVY:
+	case FOURCC_YUY2:
+	default:
+		KdXVCopyPackedData(screen, buf,
+				(CARD8 *)(screen->memory_base + offsets[0]),
+				randr, srcPitch1, dstPitch1,
+				src_w, src_h, src_y, src_x, src_h, src_w);
+		break;
+	}
+
+	return Success;
 }
 
 static int
@@ -325,13 +433,11 @@ GLAMOPutImage(KdScreenInfo *screen, DrawablePtr pDraw,
 	ScreenPtr pScreen = screen->pScreen;
 	KdScreenPriv(pScreen);
 	GLAMOCardInfo(pScreenPriv);
-	GLAMOScreenInfo(pScreenPriv);
 	GLAMOPortPrivPtr pPortPriv = (GLAMOPortPrivPtr)data;
 	char *mmio = glamoc->reg_base;
 	INT32 x1, x2, y1, y2;
 	int randr = RR_Rotate_0 /* XXX */;
-	int srcPitch, srcPitch2, dstPitch;
-	int top, left, npixels, nlines, size;
+	int top, left, npixels, nlines;
 	BoxRec dstBox;
 	int dst_width = width, dst_height = height;
 	int rot_x1, rot_y1, rot_x2, rot_y2;
@@ -423,87 +529,25 @@ GLAMOPutImage(KdScreenInfo *screen, DrawablePtr pDraw,
 		break;
 	}
 
-	switch(id) {
-	case FOURCC_YV12:
-	case FOURCC_I420:
-		dstPitch = ((dst_width << 1) + 15) & ~15;
-		srcPitch = (width + 3) & ~3;
-		srcPitch2 = ((width >> 1) + 3) & ~3;
-		size = dstPitch * dst_height;
-		break;
-	case FOURCC_UYVY:
-	case FOURCC_YUY2:
-	default:
-		dstPitch = ((dst_width << 1) + 15) & ~15;
-		srcPitch = (width << 1);
-		srcPitch2 = 0;
-		size = dstPitch * dst_height;
-		break;
-	}
-
-	if (pPortPriv->off_screen != NULL && size != pPortPriv->size) {
-		KdOffscreenFree(screen->pScreen, pPortPriv->off_screen);
-		pPortPriv->off_screen = 0;
-	}
-
-	if (pPortPriv->off_screen == NULL) {
-		pPortPriv->off_screen = KdOffscreenAlloc(screen->pScreen,
-		    size * 2, 64, TRUE, GLAMOVideoSave, pPortPriv);
-		if (pPortPriv->off_screen == NULL)
-			return BadAlloc;
-	}
-
-
-	if (pDraw->type == DRAWABLE_WINDOW)
-		pPortPriv->pPixmap =
-		    (*pScreen->GetWindowPixmap)((WindowPtr)pDraw);
-	else
-		pPortPriv->pPixmap = (PixmapPtr)pDraw;
-
-	/* Migrate the pixmap to offscreen if necessary. */
-	if (!kaaPixmapIsOffscreen(pPortPriv->pPixmap))
-		kaaMoveInPixmap(pPortPriv->pPixmap);
-
-	if (!kaaPixmapIsOffscreen(pPortPriv->pPixmap)) {
-		return BadAlloc;
-	}
-
-	pPortPriv->src_offset = pPortPriv->off_screen->offset;
-	pPortPriv->src_addr = (CARD8 *)(pScreenPriv->screen->memory_base +
-	    pPortPriv->src_offset);
-	pPortPriv->src_pitch = dstPitch;
-	pPortPriv->size = size;
-	pPortPriv->pDraw = pDraw;
-
-	/* copy data */
 	top = rot_y1 >> 16;
-	left = (rot_x1 >> 16) & ~1;
-	npixels = ((((rot_x2 + 0xffff) >> 16) + 1) & ~1) - left;
+	left = rot_x1 >> 16;
+	npixels = ((rot_x2 + 0xffff) >> 16) - left;
+	nlines  = ((rot_y2 + 0xffff) >> 16) - top;
 
-	/* Since we're probably overwriting the area that might still be used
-	 * for the last PutImage request, wait for idle.
+	/*
+	 * We kaaWaitSync below.  This guarantees only one buffer
+	 * is locked by ISP.  Thus, if ISP is busy, the buffer
+	 * knext is free.
+	 *
+	 * This is a simple scheme.  Only dual buffer benefits.
 	 */
-	GLAMOWaitIdle(glamos);
+	if (GLAMOEngineBusy(pScreen, GLAMO_ENGINE_ISP))
+		pPortPriv->idx = (pPortPriv->idx + 1) % GLAMO_VIDEO_NUM_BUFS;
 
-	switch(id) {
-	case FOURCC_YV12:
-	case FOURCC_I420:
-		top &= ~1;
-		nlines = ((((rot_y2 + 0xffff) >> 16) + 1) & ~1) - top;
-		/* pack the source as YUY2 to vram */
-		KdXVCopyPlanarData(screen, buf, pPortPriv->src_addr, randr,
-		    srcPitch, srcPitch2, dstPitch, rot_src_w, rot_src_h,
-		    height, top, left, nlines, npixels, id);
-		break;
-	case FOURCC_UYVY:
-	case FOURCC_YUY2:
-	default:
-		nlines = ((rot_y2 + 0xffff) >> 16) - top;
-		KdXVCopyPackedData(screen, buf, pPortPriv->src_addr, randr,
-		    srcPitch, dstPitch, rot_src_w, rot_src_h, top, left,
-		    nlines, npixels);
-		break;
-	}
+	if (GLAMOUploadImage(screen, pDraw, pPortPriv,
+			     left, top, npixels, nlines,
+			     id, randr, buf, width, height))
+		return BadAlloc;
 
 	/* update cliplist */
 	if (!REGION_EQUAL(screen->pScreen, &pPortPriv->clip, clipBoxes)) {
@@ -524,14 +568,15 @@ GLAMOPutImage(KdScreenInfo *screen, DrawablePtr pDraw,
 	pPortPriv->dst_w = rot_drw_w;
 	pPortPriv->dst_h = rot_drw_h;
 
+	kaaWaitSync(pScreen);
 	GlamoDisplayVideo(screen, pPortPriv);
 
 	return Success;
 }
 
 static int
-GLAMOReputImage(KdScreenInfo *screen, DrawablePtr pDraw, short drw_x, short drw_y,
-    RegionPtr clipBoxes, pointer data)
+GLAMOReputImage(KdScreenInfo *screen, DrawablePtr pDraw,
+		short drw_x, short drw_y, RegionPtr clipBoxes, pointer data)
 {
 	ScreenPtr pScreen = screen->pScreen;
 	GLAMOPortPrivPtr	pPortPriv = (GLAMOPortPrivPtr)data;
@@ -565,6 +610,7 @@ GLAMOReputImage(KdScreenInfo *screen, DrawablePtr pDraw, short drw_x, short drw_
 
 	/* XXX: What do the drw_x and drw_y here mean for us? */
 
+	kaaWaitSync(pScreen);
 	GlamoDisplayVideo(screen, pPortPriv);
 
 	return Success;
@@ -590,20 +636,23 @@ GLAMOQueryImageAttributes(KdScreenInfo *screen, int id, unsigned short *w,
 	case FOURCC_YV12:
 	case FOURCC_I420:
 		*h = (*h + 1) & ~1;
-		size = (*w + 3) & ~3;
+
+		tmp = SYS_PITCH_ALIGN(*w);
+		size = tmp * *h;
+
 		if (pitches)
-			pitches[0] = size;
-		size *= *h;
+			pitches[0] = tmp;
 		if (offsets)
 			offsets[1] = size;
-		tmp = ((*w >> 1) + 3) & ~3;
+
+		tmp = SYS_PITCH_ALIGN(*w / 2);
+		size += tmp * *h / 2;
 		if (pitches)
 			pitches[1] = pitches[2] = tmp;
-		tmp *= (*h >> 1);
-		size += tmp;
 		if (offsets)
 			offsets[2] = size;
-		size += tmp;
+
+		size += tmp * *h / 2;
 		break;
 	case FOURCC_UYVY:
 	case FOURCC_YUY2:
@@ -643,6 +692,7 @@ static KdAttributeRec Attributes[NUM_ATTRIBUTES] =
 {
 };
 
+#ifdef PACKED_IMAGE
 #define NUM_IMAGES 4
 
 static KdImageRec Images[NUM_IMAGES] =
@@ -652,6 +702,15 @@ static KdImageRec Images[NUM_IMAGES] =
 	XVIMAGE_I420,
 	XVIMAGE_UYVY
 };
+#else
+#define NUM_IMAGES 2
+
+static KdImageRec Images[NUM_IMAGES] =
+{
+	XVIMAGE_YV12,
+	XVIMAGE_I420,
+};
+#endif /* PACKED_IMAGE */
 
 static KdVideoAdaptorPtr
 GLAMOSetupImageVideo(ScreenPtr pScreen)
@@ -662,10 +721,11 @@ GLAMOSetupImageVideo(ScreenPtr pScreen)
 	GLAMOPortPrivPtr pPortPriv;
 	int i;
 
-	glamos->num_texture_ports = 16;
+	glamos->num_texture_ports = 1;
 
-	adapt = xcalloc(1, sizeof(KdVideoAdaptorRec) + glamos->num_texture_ports *
-	    (sizeof(GLAMOPortPrivRec) + sizeof(DevUnion)));
+	adapt = xcalloc(1, sizeof(KdVideoAdaptorRec) +
+			   glamos->num_texture_ports *
+			   (sizeof(GLAMOPortPrivRec) + sizeof(DevUnion)));
 	if (adapt == NULL)
 		return NULL;
 
@@ -679,8 +739,8 @@ GLAMOSetupImageVideo(ScreenPtr pScreen)
 	adapt->nPorts = glamos->num_texture_ports;
 	adapt->pPortPrivates = (DevUnion*)(&adapt[1]);
 
-	pPortPriv =
-	    (GLAMOPortPrivPtr)(&adapt->pPortPrivates[glamos->num_texture_ports]);
+	pPortPriv = (GLAMOPortPrivPtr)
+		(&adapt->pPortPrivates[glamos->num_texture_ports]);
 
 	for (i = 0; i < glamos->num_texture_ports; i++)
 		adapt->pPortPrivates[i].ptr = &pPortPriv[i];
@@ -701,8 +761,8 @@ GLAMOSetupImageVideo(ScreenPtr pScreen)
 	adapt->ReputImage = GLAMOReputImage;
 	adapt->QueryImageAttributes = GLAMOQueryImageAttributes;
 
-	/* gotta uninit this someplace */
-	REGION_INIT(pScreen, &pPortPriv->clip, NullBox, 0);
+	for (i = 0; i < glamos->num_texture_ports; i++)
+		REGION_INIT(pScreen, &pPortPriv[i].clip, NullBox, 0);
 
 	glamos->pAdaptor = adapt;
 
@@ -710,22 +770,6 @@ GLAMOSetupImageVideo(ScreenPtr pScreen)
 	xvSaturation = MAKE_ATOM("XV_SATURGLAMOON");
 
 	return adapt;
-}
-
-static void GLAMOPowerUp(ScreenPtr pScreen)
-{
-	GLAMOEngineEnable(pScreen, GLAMO_ENGINE_ISP);
-	GLAMOEngineReset(pScreen, GLAMO_ENGINE_ISP);
-
-	/* HW_DEBUG_0?? */
-	//MMIOSetBitMask(mmio, REG_ISP(0x102), 0x0020, 0);
-}
-
-static void GLAMOPowerDown(ScreenPtr pScreen)
-{
-	GLAMOEngineReset(pScreen, GLAMO_ENGINE_ISP);
-
-	/* ... and stop the clock */
 }
 
 Bool GLAMOInitVideo(ScreenPtr pScreen)
@@ -748,8 +792,6 @@ Bool GLAMOInitVideo(ScreenPtr pScreen)
 	newAdaptor = GLAMOSetupImageVideo(pScreen);
 
 	if (newAdaptor)  {
-		GLAMOPowerUp(pScreen);
-
 		if (!num_adaptors) {
 			num_adaptors = 1;
 			adaptors = &newAdaptor;
@@ -787,12 +829,147 @@ GLAMOFiniVideo(ScreenPtr pScreen)
 	if (!adapt)
 		return;
 
-	GLAMOPowerDown(pScreen);
-
 	for (i = 0; i < glamos->num_texture_ports; i++) {
-		pPortPriv = (GLAMOPortPrivPtr)(&adapt->pPortPrivates[i].ptr);
+		pPortPriv = (GLAMOPortPrivPtr)(adapt->pPortPrivates[i].ptr);
 		REGION_UNINIT(pScreen, &pPortPriv->clip);
 	}
 	xfree(adapt);
 	glamos->pAdaptor = NULL;
 }
+
+static void GLAMOSetOnFlyRegs(ScreenPtr pScreen)
+{
+	KdScreenPriv(pScreen);
+	GLAMOScreenInfo(pScreenPriv);
+	struct {
+		int src_block_x;
+		int src_block_y;
+		int src_block_w;
+		int src_block_h;
+		int jpeg_out_y;
+		int jpeg_out_x;
+		int fifo_full_cnt;
+		int in_length;
+		int fifo_data_cnt;
+		int in_height;
+	} onfly;
+	RING_LOCALS;
+
+	onfly.src_block_y = 32;
+	onfly.src_block_x = 32;
+	onfly.src_block_w = 36;
+	onfly.src_block_h = 35;
+	onfly.jpeg_out_y = 32;
+	onfly.jpeg_out_x = 32;
+	onfly.fifo_full_cnt = onfly.src_block_w * 2 + 2;
+	onfly.in_length = onfly.jpeg_out_x + 3;
+	onfly.fifo_data_cnt = onfly.src_block_w * onfly.src_block_h / 2;
+	onfly.in_height = onfly.jpeg_out_y + 2;
+
+	BEGIN_DMA(10);
+	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE1,
+		onfly.src_block_y << 10 | onfly.src_block_x << 2);
+	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE2,
+		onfly.src_block_h << 8 | onfly.src_block_w);
+	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE3,
+		onfly.jpeg_out_y << 8 | onfly.jpeg_out_x);
+	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE4,
+		onfly.fifo_full_cnt << 8 | onfly.in_length);
+	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE5,
+		onfly.fifo_data_cnt << 6 | onfly.in_height);
+	END_DMA();
+}
+
+static void GLAMOSetWeightRegs(ScreenPtr pScreen)
+{
+	KdScreenPriv(pScreen);
+	GLAMOScreenInfo(pScreenPriv);
+	int left = 1 << 14;
+	RING_LOCALS;
+
+	/* nearest */
+
+	BEGIN_DMA(12);
+	OUT_BURST(GLAMO_REG_ISP_DEC_SCALEH_MATRIX, 10);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  0, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  2, 0);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  4, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  6, 0);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  8, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 10, 0);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 12, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 14, 0);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 16, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 18, 0);
+	END_DMA();
+
+	BEGIN_DMA(12);
+	OUT_BURST(GLAMO_REG_ISP_DEC_SCALEV_MATRIX, 10);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  0, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  2, 0);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  4, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  6, 0);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  8, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 10, 0);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 12, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 14, 0);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 16, left);
+	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 18, 0);
+	END_DMA();
+}
+
+static void GLAMOInitISP(ScreenPtr pScreen)
+{
+	KdScreenPriv(pScreen);
+	GLAMOScreenInfo(pScreenPriv);
+	RING_LOCALS;
+
+	BEGIN_DMA(16);
+
+	/*
+	 * In 8.8 fixed point,
+	 *
+	 *  R = Y + 1.402 (Cr-128)
+	 *    = Y + 0x0167 Cr - 0xb3
+	 *
+	 *  G = Y - 0.34414 (Cb-128) - 0.71414 (Cr-128)
+	 *    = Y - 0x0058 Cb - 0x00b6 Cr + 0x89
+	 *
+	 *  B = Y + 1.772 (Cb-128)
+	 *    = Y + 0x01c5 Cb - 0xe2
+	 */
+
+	OUT_REG(GLAMO_REG_ISP_YUV2RGB_11, 0x0167);
+	OUT_REG(GLAMO_REG_ISP_YUV2RGB_21, 0x01c5);
+	OUT_REG(GLAMO_REG_ISP_YUV2RGB_32, 0x00b6);
+	OUT_REG(GLAMO_REG_ISP_YUV2RGB_33, 0x0058);
+	OUT_REG(GLAMO_REG_ISP_YUV2RGB_RG, 0xb3 << 8 | 0x89);
+	OUT_REG(GLAMO_REG_ISP_YUV2RGB_B, 0xe2);
+
+	OUT_REG(GLAMO_REG_ISP_PORT1_DEC_EN, GLAMO_ISP_PORT1_EN_OUTPUT);
+	OUT_REG(GLAMO_REG_ISP_PORT2_EN, GLAMO_ISP_PORT2_EN_DECODE);
+
+	END_DMA();
+
+	GLAMOSetOnFlyRegs(pScreen);
+	GLAMOSetWeightRegs(pScreen);
+}
+
+Bool
+GLAMOVideoSetup(ScreenPtr pScreen)
+{
+	GLAMOEngineEnable(pScreen, GLAMO_ENGINE_ISP);
+	GLAMOEngineReset(pScreen, GLAMO_ENGINE_ISP);
+
+	GLAMOInitISP(pScreen);
+
+	return TRUE;
+}
+
+void
+GLAMOVideoTeardown(ScreenPtr pScreen)
+{
+	GLAMOEngineReset(pScreen, GLAMO_ENGINE_ISP);
+	GLAMOEngineDisable(pScreen, GLAMO_ENGINE_ISP);
+}
+
