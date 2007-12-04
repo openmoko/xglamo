@@ -367,7 +367,9 @@ GLAMODrawEnable(ScreenPtr pScreen)
 #endif
 
 	kaaMarkSync(pScreen);
+
 }
+
 
 void
 GLAMODrawDisable(ScreenPtr pScreen)
