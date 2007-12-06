@@ -212,8 +212,8 @@ GLAMOEngineBusy(ScreenPtr pScreen, enum glamo_engine engine)
 	if (!mmio)
 		return FALSE;
 
-	if (glamos->indirectBuffer != NULL)
-		GLAMOFlushIndirect(glamos, 0);
+	if (glamos->cmd_queue_cache != NULL)
+		GLAMOFlushCMDQCache(glamos, 0);
 
 	switch (engine)
 	{
@@ -254,8 +254,8 @@ GLAMOEngineWait(ScreenPtr pScreen, enum glamo_engine engine)
 	if (!mmio)
 		return;
 
-	if (glamos->indirectBuffer != NULL)
-		GLAMOFlushIndirect(glamos, 0);
+	if (glamos->cmd_queue_cache != NULL)
+		GLAMOFlushCMDQCache(glamos, 0);
 
 	switch (engine)
 	{
@@ -292,17 +292,17 @@ GLAMOEngineWait(ScreenPtr pScreen, enum glamo_engine engine)
 }
 
 
-dmaBuf *
-GLAMOGetDMABuffer(GLAMOScreenInfo *glamos)
+MemBuf *
+GLAMOCreateCMDQCache(GLAMOScreenInfo *glamos)
 {
-	dmaBuf *buf;
+	MemBuf *buf;
 
-	buf = (dmaBuf *)xalloc(sizeof(dmaBuf));
+	buf = (MemBuf *)xcalloc(1, sizeof(MemBuf));
 	if (buf == NULL)
 		return NULL;
 
 	buf->size = glamos->ring_len / 2;
-	buf->address = xalloc(buf->size);
+	buf->address = xcalloc(1, buf->size);
 	if (buf->address == NULL) {
 		xfree(buf);
 		return NULL;
@@ -313,17 +313,17 @@ GLAMOGetDMABuffer(GLAMOScreenInfo *glamos)
 }
 
 static void
-GLAMODispatchIndirectDMA(GLAMOScreenInfo *glamos)
+GLAMODispatchCMDQCache(GLAMOScreenInfo *glamos)
 {
 	GLAMOCardInfo *glamoc = glamos->glamoc;
-	dmaBuf *buf = glamos->indirectBuffer;
+	MemBuf *buf = glamos->cmd_queue_cache;
 	char *mmio = glamoc->reg_base;
 	CARD16 *addr;
 	int count, ring_count;
 	TIMEOUT_LOCALS;
 
-	addr = (CARD16 *)((char *)buf->address + glamos->indirectStart);
-	count = (buf->used - glamos->indirectStart) / 2;
+	addr = (CARD16 *)((char *)buf->address + glamos->cmd_queue_cache_start);
+	count = (buf->used - glamos->cmd_queue_cache_start) / 2;
 	ring_count = glamos->ring_len / 2;
 
 	WHILE_NOT_TIMEOUT(.5) {
@@ -357,20 +357,20 @@ GLAMODispatchIndirectDMA(GLAMOScreenInfo *glamos)
 }
 
 void
-GLAMOFlushIndirect(GLAMOScreenInfo *glamos, Bool discard)
+GLAMOFlushCMDQCache(GLAMOScreenInfo *glamos, Bool discard)
 {
-	dmaBuf *buf = glamos->indirectBuffer;
+	MemBuf *buf = glamos->cmd_queue_cache;
 
-	if ((glamos->indirectStart == buf->used) && !discard)
+	if ((glamos->cmd_queue_cache_start == buf->used) && !discard)
 		return;
-	GLAMODispatchIndirectDMA(glamos);
+	GLAMODispatchCMDQCache(glamos);
 
 	buf->used = 0;
-	glamos->indirectStart = 0;
+	glamos->cmd_queue_cache_start = 0;
 }
 
 static Bool
-GLAMODMAInit(ScreenPtr pScreen)
+GLAMOCMDQInit(ScreenPtr pScreen)
 {
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
@@ -380,13 +380,13 @@ GLAMODMAInit(ScreenPtr pScreen)
 
 	glamos->ring_len = (cq_len + 1) * 1024;
 
-	glamos->dma_space = KdOffscreenAlloc(pScreen, glamos->ring_len + 4,
+	glamos->cmd_queue = KdOffscreenAlloc(pScreen, glamos->ring_len + 4,
 			                     16, TRUE, NULL, NULL);
-	if (!glamos->dma_space)
+	if (!glamos->cmd_queue)
 		return FALSE;
 
 	glamos->ring_addr = (CARD16 *) (pScreenPriv->screen->memory_base +
-			                glamos->dma_space->offset);
+			                glamos->cmd_queue->offset);
 	glamos->ring_read = 0;
 	glamos->ring_write = 0;
 
@@ -398,9 +398,9 @@ GLAMODMAInit(ScreenPtr pScreen)
 	GLAMOEngineReset(glamos->screen->pScreen, GLAMO_ENGINE_CMDQ);
 
 	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_BASE_ADDRL,
-			 glamos->dma_space->offset & 0xffff);
+		   glamos->cmd_queue->offset & 0xffff);
 	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_BASE_ADDRH,
-			 (glamos->dma_space->offset >> 16) & 0x7f);
+		   (glamos->cmd_queue->offset >> 16) & 0x7f);
 	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_LEN, cq_len);
 
 	MMIO_OUT16(mmio, GLAMO_REG_CMDQ_WRITE_ADDRH, 0);
@@ -416,27 +416,27 @@ GLAMODMAInit(ScreenPtr pScreen)
 }
 
 void
-GLAMODMASetup(ScreenPtr pScreen)
+GLAMOCMDQCacheSetup(ScreenPtr pScreen)
 {
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 
-	GLAMODMAInit(pScreen);
+	GLAMOCMDQInit(pScreen);
 
-	glamos->indirectBuffer = GLAMOGetDMABuffer(glamos);
-	if (glamos->indirectBuffer == FALSE)
-		FatalError("Failed to allocate DMA buffer.\n");
+	glamos->cmd_queue_cache = GLAMOCreateCMDQCache(glamos);
+	if (glamos->cmd_queue_cache == FALSE)
+		FatalError("Failed to allocate cmd queue cache buffer.\n");
 }
 
 void
-GLAMODMATeardown(ScreenPtr pScreen)
+GLAMOCMQCacheTeardown(ScreenPtr pScreen)
 {
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 
 	GLAMOEngineWait(pScreen, GLAMO_ENGINE_ALL);
 
-	xfree(glamos->indirectBuffer->address);
-	xfree(glamos->indirectBuffer);
-	glamos->indirectBuffer = NULL;
+	xfree(glamos->cmd_queue_cache->address);
+	xfree(glamos->cmd_queue_cache);
+	glamos->cmd_queue_cache = NULL;
 }
