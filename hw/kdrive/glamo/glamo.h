@@ -137,11 +137,11 @@ typedef struct _GLAMOPortPriv {
 	int src_w, src_h, dst_w, dst_h;
 } GLAMOPortPrivRec, *GLAMOPortPrivPtr;
 
-typedef struct _dmaBuf {
+typedef struct _MemBuf {
 	int size;
 	int used;
 	void *address;
-} dmaBuf;
+} MemBuf;
 
 typedef struct _GLAMOScreenInfo {
 	union {
@@ -161,14 +161,18 @@ typedef struct _GLAMOScreenInfo {
 	KdVideoAdaptorPtr pAdaptor;
 	int		num_texture_ports;
 
-	KdOffscreenArea *dma_space;	/* For "DMA" from framebuffer. */
+	KdOffscreenArea *cmd_queue;	/* mmapped on-device cmd queue. */
 	CARD16		*ring_addr;	/* Beginning of ring buffer. */
 	int		ring_write;	/* Index of write ptr in ring. */
 	int		ring_read;	/* Index of read ptr in ring. */
 	int		ring_len;
-
-	dmaBuf		*indirectBuffer;
-	int		indirectStart;
+	/*
+	 * cmd queue cache in system memory
+	 * It is to be flushed to cmd_queue_space
+	 * "at once", when we are happy with it.
+	 */
+	MemBuf		*cmd_queue_cache;
+	int		cmd_queue_cache_start;
 } GLAMOScreenInfo;
 
 #define getGLAMOScreenInfo(kd)	((GLAMOScreenInfo *) ((kd)->screen->driver))
