@@ -185,14 +185,14 @@ GlamoDisplayVideo(KdScreenInfo *screen, GLAMOPortPrivPtr pPortPriv)
 	      GLAMO_ISP_EN3_YUV420;
 	en3 |= GLAMO_ISP_EN3_SCALE_IMPROVE;
 
-	BEGIN_DMA(8);
+	BEGIN_CMDQ(8);
 
 	OUT_REG(GLAMO_REG_ISP_EN3, en3);
 	OUT_REG(GLAMO_REG_ISP_DEC_PITCH_Y, pPortPriv->src_pitch1 & 0x1fff);
 	OUT_REG(GLAMO_REG_ISP_DEC_PITCH_UV, pPortPriv->src_pitch2 & 0x1fff);
 	OUT_REG(GLAMO_REG_ISP_PORT1_DEC_PITCH, dst_pitch & 0x1fff);
 
-	END_DMA();
+	END_CMDQ();
 
 	offsets = pPortPriv->src_offsets[pPortPriv->idx];
 
@@ -213,7 +213,7 @@ GlamoDisplayVideo(KdScreenInfo *screen, GLAMOPortPrivPtr pPortPriv)
 
 		GLAMOEngineWait(pScreen, GLAMO_ENGINE_ISP);
 
-		BEGIN_DMA(16);
+		BEGIN_CMDQ(16);
 		srcO = offsets[0] + srcY * pPortPriv->src_pitch1 + srcX;
 		OUT_REG(GLAMO_REG_ISP_DEC_Y_ADDRL, srcO & 0xffff);
 		OUT_REG(GLAMO_REG_ISP_DEC_Y_ADDRH, (srcO >> 16) & 0x7f);
@@ -228,9 +228,9 @@ GlamoDisplayVideo(KdScreenInfo *screen, GLAMOPortPrivPtr pPortPriv)
 
 		OUT_REG(GLAMO_REG_ISP_DEC_HEIGHT, srch & 0x1fff);
 		OUT_REG(GLAMO_REG_ISP_DEC_WIDTH, srcw & 0x1fff);
-		END_DMA();
+		END_CMDQ();
 
-		BEGIN_DMA(16);
+		BEGIN_CMDQ(16);
 		dstO = dst_offset + dstY * dst_pitch + dstX * 2;
 		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_0_ADDRL, dstO & 0xffff);
 		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_0_ADDRH, (dstO >> 16) & 0x7f);
@@ -247,7 +247,7 @@ GlamoDisplayVideo(KdScreenInfo *screen, GLAMOPortPrivPtr pPortPriv)
 		OUT_REG(GLAMO_REG_ISP_EN1, GLAMO_ISP_EN1_FIRE_ISP);
 		OUT_REG(GLAMO_REG_ISP_EN1, 0);
 
-		END_DMA();
+		END_CMDQ();
 
 		pBox++;
 	}
@@ -866,7 +866,7 @@ static void GLAMOSetOnFlyRegs(ScreenPtr pScreen)
 	onfly.fifo_data_cnt = onfly.src_block_w * onfly.src_block_h / 2;
 	onfly.in_height = onfly.jpeg_out_y + 2;
 
-	BEGIN_DMA(10);
+	BEGIN_CMDQ(10);
 	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE1,
 		onfly.src_block_y << 10 | onfly.src_block_x << 2);
 	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE2,
@@ -877,7 +877,7 @@ static void GLAMOSetOnFlyRegs(ScreenPtr pScreen)
 		onfly.fifo_full_cnt << 8 | onfly.in_length);
 	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE5,
 		onfly.fifo_data_cnt << 6 | onfly.in_height);
-	END_DMA();
+	END_CMDQ();
 }
 
 static void GLAMOSetWeightRegs(ScreenPtr pScreen)
@@ -889,7 +889,7 @@ static void GLAMOSetWeightRegs(ScreenPtr pScreen)
 
 	/* nearest */
 
-	BEGIN_DMA(12);
+	BEGIN_CMDQ(12);
 	OUT_BURST(GLAMO_REG_ISP_DEC_SCALEH_MATRIX, 10);
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  0, left);
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  2, 0);
@@ -901,9 +901,9 @@ static void GLAMOSetWeightRegs(ScreenPtr pScreen)
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 14, 0);
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 16, left);
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 18, 0);
-	END_DMA();
+	END_CMDQ();
 
-	BEGIN_DMA(12);
+	BEGIN_CMDQ(12);
 	OUT_BURST(GLAMO_REG_ISP_DEC_SCALEV_MATRIX, 10);
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  0, left);
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  2, 0);
@@ -915,7 +915,7 @@ static void GLAMOSetWeightRegs(ScreenPtr pScreen)
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 14, 0);
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 16, left);
 	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 18, 0);
-	END_DMA();
+	END_CMDQ();
 }
 
 static void GLAMOInitISP(ScreenPtr pScreen)
@@ -924,7 +924,7 @@ static void GLAMOInitISP(ScreenPtr pScreen)
 	GLAMOScreenInfo(pScreenPriv);
 	RING_LOCALS;
 
-	BEGIN_DMA(16);
+	BEGIN_CMDQ(16);
 
 	/*
 	 * In 8.8 fixed point,
@@ -949,7 +949,7 @@ static void GLAMOInitISP(ScreenPtr pScreen)
 	OUT_REG(GLAMO_REG_ISP_PORT1_DEC_EN, GLAMO_ISP_PORT1_EN_OUTPUT);
 	OUT_REG(GLAMO_REG_ISP_PORT2_EN, GLAMO_ISP_PORT2_EN_DECODE);
 
-	END_DMA();
+	END_CMDQ();
 
 	GLAMOSetOnFlyRegs(pScreen);
 	GLAMOSetWeightRegs(pScreen);

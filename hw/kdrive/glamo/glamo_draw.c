@@ -122,14 +122,14 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 
 	GLAMO_LOG("enter");
 
-	BEGIN_DMA(12);
+	BEGIN_CMDQ(12);
 	OUT_REG(GLAMO_REG_2D_DST_ADDRL, offset & 0xffff);
 	OUT_REG(GLAMO_REG_2D_DST_ADDRH, (offset >> 16) & 0x7f);
 	OUT_REG(GLAMO_REG_2D_DST_PITCH, pitch);
 	OUT_REG(GLAMO_REG_2D_DST_HEIGHT, pPix->drawable.height);
 	OUT_REG(GLAMO_REG_2D_PAT_FG, fg);
 	OUT_REG(GLAMO_REG_2D_COMMAND2, settings);
-	END_DMA();
+	END_CMDQ();
 
 	GLAMO_LOG("leave");
 
@@ -143,7 +143,7 @@ GLAMOSolid(int x1, int y1, int x2, int y2)
 	GLAMOScreenInfo *glamos = accel_glamos;
 	RING_LOCALS;
 
-	BEGIN_DMA(14);
+	BEGIN_CMDQ(14);
 	OUT_REG(GLAMO_REG_2D_DST_X, x1);
 	OUT_REG(GLAMO_REG_2D_DST_Y, y1);
 	OUT_REG(GLAMO_REG_2D_RECT_WIDTH, x2 - x1);
@@ -151,7 +151,7 @@ GLAMOSolid(int x1, int y1, int x2, int y2)
 	OUT_REG(GLAMO_REG_2D_COMMAND3, 0);
 	OUT_REG(GLAMO_REG_2D_ID1, 0);
 	OUT_REG(GLAMO_REG_2D_ID2, 0);
-	END_DMA();
+	END_CMDQ();
 	GLAMO_LOG("leave");
 }
 
@@ -192,7 +192,7 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 
 	settings = GLAMOBltRop[alu] << 8;
 
-	BEGIN_DMA(16);
+	BEGIN_CMDQ(16);
 
 	OUT_REG(GLAMO_REG_2D_SRC_ADDRL, src_offset & 0xffff);
 	OUT_REG(GLAMO_REG_2D_SRC_ADDRH, (src_offset >> 16) & 0x7f);
@@ -205,7 +205,7 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 
 	OUT_REG(GLAMO_REG_2D_COMMAND2, settings);
 
-	END_DMA();
+	END_CMDQ();
 
 	GLAMO_LOG("leave");
 
@@ -218,7 +218,7 @@ GLAMOCopy(int srcX, int srcY, int dstX, int dstY, int w, int h)
 	GLAMOScreenInfo *glamos = accel_glamos;
 	RING_LOCALS;
 
-	BEGIN_DMA(18);
+	BEGIN_CMDQ(18);
 	OUT_REG(GLAMO_REG_2D_SRC_X, srcX);
 	OUT_REG(GLAMO_REG_2D_SRC_Y, srcY);
 	OUT_REG(GLAMO_REG_2D_DST_X, dstX);
@@ -228,7 +228,7 @@ GLAMOCopy(int srcX, int srcY, int dstX, int dstY, int w, int h)
 	OUT_REG(GLAMO_REG_2D_COMMAND3, 0);
 	OUT_REG(GLAMO_REG_2D_ID1, 0);
 	OUT_REG(GLAMO_REG_2D_ID2, 0);
-	END_DMA();
+	END_CMDQ();
 }
 
 static void
@@ -271,11 +271,12 @@ GLAMOBlockHandler(pointer blockData, OSTimePtr timeout, pointer readmask)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 
-	/* When the server is going to sleep, make sure that all DMA data has
-	 * been flushed.
+	/* When the server is going to sleep,
+	 * make sure that the cmd queue cache
+	 * has been flushed.
 	 */
-	if (glamos->indirectBuffer)
-		GLAMOFlushIndirect(glamos, 1);
+	if (glamos->cmd_queue_cache)
+		GLAMOFlushCMDQCache(glamos, 1);
 }
 
 static void
@@ -337,7 +338,7 @@ GLAMODrawEnable(ScreenPtr pScreen)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 
-	GLAMODMASetup(pScreen);
+	GLAMOCMDQCacheSetup(pScreen);
 	GLAMODrawSetup(pScreen);
 
 	glamos->scratch_area = NULL;
@@ -375,7 +376,7 @@ void
 GLAMODrawDisable(ScreenPtr pScreen)
 {
 	kaaWaitSync(pScreen);
-	GLAMODMATeardown(pScreen);
+	GLAMOCMQCacheTeardown(pScreen);
 }
 
 void
