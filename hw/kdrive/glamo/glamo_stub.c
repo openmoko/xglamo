@@ -43,6 +43,16 @@ InitCard(char *name)
 void
 InitOutput(ScreenInfo *pScreenInfo, int argc, char **argv)
 {
+	char *verbosity_str=NULL;
+	int verbosity=0;
+	verbosity_str = getenv("VERBOSITY");
+	if (!verbosity_str) {
+		verbosity = 5;
+	} else {
+		verbosity = atoi(verbosity_str);
+	}
+	LogSetParameter(XLOG_VERBOSITY, verbosity) ;
+	LogMessage(X_INFO, "verbosity set to %d\n", verbosity);
 	KdInitOutput(pScreenInfo, argc, argv);
 }
 

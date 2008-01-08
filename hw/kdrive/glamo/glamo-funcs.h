@@ -1,9 +1,6 @@
 /*
  * Copyright © 2007 OpenMoko, Inc.
  *
- * This driver is based on Xati,
- * Copyright © 2004 Eric Anholt
- *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
  * the above copyright notice appear in all copies and that both that copyright
@@ -22,42 +19,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  *
- * Author: Dodji Seketeli <dodji@openedhand.com>
+ * Author:
+ *  Dodji Seketeli <dodji@openedhand.com>
  */
-#ifndef _GLAMO_LOG_H_
-#define _GLAMO_LOG_H_
-
-#ifdef HAVE_CONFIG_H
-#include <kdrive-config.h>
-#endif
+#ifndef _GLAMO_FUNCS_H_
+#define _GLAMO_FUNCS_H_
 
 #include <assert.h>
 #include "os.h"
+#include "kdrive.h"
 
-#ifdef NDEBUG
-/*we are not in debug mode*/
-#define GLAMO_LOG
-#define GLAMO_LOG_ERROR
+void glamoOutReg(ScreenPtr pScreen, unsigned short reg, unsigned short val);
 
-#else /*NDEBUG*/
-#define ERROR_LOG_LEVEL 3
-#define INFO_LOG_LEVEL 4
+unsigned short glamoInReg(ScreenPtr pScreen, unsigned short reg);
 
-#ifndef GLAMO_LOG
-#define GLAMO_LOG(...) \
-LogMessageVerb(X_NOTICE, INFO_LOG_LEVEL, "in %s:%d:%s: ",\
-               __FILE__, __LINE__, __func__) ; \
-LogMessageVerb(X_NOTICE, INFO_LOG_LEVEL, __VA_ARGS__)
-#endif /*GLAMO_LOG*/
+void glamoSetBitMask(ScreenPtr pScreen, int reg, int mask, int val);
 
-#ifndef GLAMO_LOG_ERROR
-#define GLAMO_LOG_ERROR(...) \
-LogMessageVerb(X_NOTICE, ERROR_LOG_LEVEL, "Error:in %s:%d:%s: ",\
-               __FILE__, __LINE__, __func__) ; \
-LogMessageVerb(X_NOTICE, ERROR_LOG_LEVEL, __VA_ARGS__)
-#endif /*GLAMO_LOG_ERROR*/
+void setCmdMode (ScreenPtr pScreen, Bool on);
 
-#endif /*NDEBUG*/
+Bool
+glamoRotateLCD (ScreenPtr pScreen, Rotation rotation);
 
-#endif /*_GLAMO_LOG_H_*/
+#endif /*_GLAMO_FUNCS_H_*/
 
