@@ -91,9 +91,9 @@ GLAMOWaitMarker(ScreenPtr pScreen, int marker)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 
-	GLAMO_LOG("enter");
+	GLAMO_LOG("enter\n");
 	GLAMOEngineWait(pScreen, GLAMO_ENGINE_ALL);
-	GLAMO_LOG("leave");
+	GLAMO_LOG("leave\n");
 }
 
 static Bool
@@ -120,7 +120,7 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 			pScreenPriv->screen->memory_base);
 	pitch = pPix->devKind;
 
-	GLAMO_LOG("enter");
+	GLAMO_LOG("enter.pitch:%d\n", pitch);
 
 	BEGIN_CMDQ(12);
 	OUT_REG(GLAMO_REG_2D_DST_ADDRL, offset & 0xffff);
@@ -131,7 +131,7 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 	OUT_REG(GLAMO_REG_2D_COMMAND2, settings);
 	END_CMDQ();
 
-	GLAMO_LOG("leave");
+	GLAMO_LOG("leave\n");
 
 	return TRUE;
 }
@@ -139,7 +139,7 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 static void
 GLAMOSolid(int x1, int y1, int x2, int y2)
 {
-	GLAMO_LOG("enter");
+	GLAMO_LOG("enter\n");
 	GLAMOScreenInfo *glamos = accel_glamos;
 	RING_LOCALS;
 
@@ -152,7 +152,7 @@ GLAMOSolid(int x1, int y1, int x2, int y2)
 	OUT_REG(GLAMO_REG_2D_ID1, 0);
 	OUT_REG(GLAMO_REG_2D_ID2, 0);
 	END_CMDQ();
-	GLAMO_LOG("leave");
+	GLAMO_LOG("leave\n");
 }
 
 static void
@@ -170,7 +170,7 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 	FbBits mask;
 	RING_LOCALS;
 
-	GLAMO_LOG("enter");
+	GLAMO_LOG("enter\n");
 
 	if (pSrc->drawable.bitsPerPixel != 16 ||
 	    pDst->drawable.bitsPerPixel != 16)
@@ -189,6 +189,8 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 	dst_offset = ((CARD8 *) pDst->devPrivate.ptr -
 			pScreenPriv->screen->memory_base);
 	dst_pitch = pDst->devKind;
+	GLAMO_LOG("src_pitch:%d, dst_pitch:%d, mem_base:%#x\n",
+		  src_pitch, dst_pitch, pScreenPriv->screen->memory_base);
 
 	settings = GLAMOBltRop[alu] << 8;
 
@@ -207,7 +209,7 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 
 	END_CMDQ();
 
-	GLAMO_LOG("leave");
+	GLAMO_LOG("leave\n");
 
 	return TRUE;
 }
@@ -234,8 +236,8 @@ GLAMOCopy(int srcX, int srcY, int dstX, int dstY, int w, int h)
 static void
 GLAMODoneCopy(void)
 {
-	GLAMO_LOG("enter");
-	GLAMO_LOG("leave");
+	GLAMO_LOG("enter\n");
+	GLAMO_LOG("leave\n");
 }
 
 static Bool
@@ -245,13 +247,15 @@ GLAMOUploadToScreen(PixmapPtr pDst, char *src, int src_pitch)
 	CARD8 *dst_offset;
 	int dst_pitch;
 
-        GLAMO_LOG("enter");
+        GLAMO_LOG("enter\n");
 	dst_offset = (CARD8 *)pDst->devPrivate.ptr;
 	dst_pitch = pDst->devKind;
 	width = pDst->drawable.width;
 	height = pDst->drawable.height;
 	bpp = pDst->drawable.bitsPerPixel;
 	bpp /= 8;
+
+	GLAMO_LOG("dst_pitch:%d, src_pitch\n", dst_pitch, src_pitch);
 
 	for (i = 0; i < height; i++)
 	{

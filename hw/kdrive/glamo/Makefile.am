@@ -28,7 +28,9 @@ libglamo_a_SOURCES = 	\
 	glamo.c		\
 	glamo.h		\
 	glamo-regs.h	\
-	glamo_video.c
+	glamo_video.c \
+	glamo-funcs.c \
+	glamo-funcs.h
 
 Xglamo_SOURCES = \
 	glamo_stub.c

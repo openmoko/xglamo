@@ -452,6 +452,16 @@ enum glamo_reg_lcd_mode3 {
 	GLAMO_LCD_MODE3_18BITS		= 0x0040,
 };
 
+enum glamo_lcd_rot_mode {
+        GLAMO_LCD_ROT_MODE_0            = 0x0000,
+        GLAMO_LCD_ROT_MODE_180          = 0x2000,
+        GLAMO_LCD_ROT_MODE_MIRROR       = 0x4000,
+        GLAMO_LCD_ROT_MODE_FLIP         = 0x6000,
+        GLAMO_LCD_ROT_MODE_90           = 0x8000,
+        GLAMO_LCD_ROT_MODE_270          = 0xa000,
+};
+#define GLAMO_LCD_ROT_MODE_MASK         0xe000
+
 enum glamo_lcd_cmd_type {
 	GLAMO_LCD_CMD_TYPE_DISP		= 0x0000,
 	GLAMO_LCD_CMD_TYPE_PARALLEL	= 0x4000,
