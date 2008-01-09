@@ -232,15 +232,15 @@ kaaPixmapUseScreen (PixmapPtr pPixmap)
 {
     KaaPixmapPriv (pPixmap);
 
-    if (pKaaPixmap->score == KAA_PIXMAP_SCORE_PINNED)
+    if (pKaaPixmap && pKaaPixmap->score == KAA_PIXMAP_SCORE_PINNED)
 	return;
 
-    if (pKaaPixmap->score == KAA_PIXMAP_SCORE_INIT) {
+    if (pKaaPixmap && pKaaPixmap->score == KAA_PIXMAP_SCORE_INIT) {
 	kaaMoveInPixmap(pPixmap);
 	pKaaPixmap->score = 0;
     }
 
-    if (pKaaPixmap->score < KAA_PIXMAP_SCORE_MAX)
+    if (pKaaPixmap && pKaaPixmap->score < KAA_PIXMAP_SCORE_MAX)
     {
 	pKaaPixmap->score++;
 	if (!kaaPixmapIsOffscreen(pPixmap) &&
@@ -254,6 +254,9 @@ void
 kaaPixmapUseMemory (PixmapPtr pPixmap)
 {
     KaaPixmapPriv (pPixmap);
+
+    if (!pKaaPixmap)
+	return;
 
     if (pKaaPixmap->score == KAA_PIXMAP_SCORE_PINNED)
 	return;
@@ -1038,10 +1041,17 @@ kaaDrawInit (ScreenPtr		pScreen,
     if ((pKaaScr->info->flags & KAA_OFFSCREEN_PIXMAPS) &&
 	screen->off_screen_base < screen->memory_size)
     {
+	LogMessage(X_INFO, "initialising offscreen pixmaps\n");
 	if (!dixRequestPrivate(kaaPixmapPrivateKey, sizeof (KaaPixmapPrivRec)))
 	    return FALSE;
 	pScreen->CreatePixmap = kaaCreatePixmap;
 	pScreen->DestroyPixmap = kaaDestroyPixmap;
+    }
+    else
+    {
+	LogMessage(X_INFO, "disabling offscreen pixmaps\n");
+	if (!dixRequestPrivate(kaaPixmapPrivateKey, 0))
+	    return FALSE;
     }
 
     return TRUE;
