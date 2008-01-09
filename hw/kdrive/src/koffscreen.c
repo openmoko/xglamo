@@ -319,6 +319,12 @@ KdOffscreenMarkUsed (PixmapPtr pPixmap)
     KdScreenPriv (pPixmap->drawable.pScreen);
     static int iter = 0;
 
+    if (!pKaaPixmap) {
+	LogMessage (X_ERROR, "this pixmap is incompatible with "
+		             "offscreen video memory !"
+			     "Is offscreen memory disabled?\n");
+	return;
+    }
     if (!pKaaPixmap->area)
 	return;
 
