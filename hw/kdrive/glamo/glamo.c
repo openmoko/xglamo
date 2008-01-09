@@ -321,9 +321,10 @@ glamoSetScannoutGeometry (ScreenPtr pScreen,
 		is_portrait = TRUE;
 	else
 		is_portrait = FALSE;
+	GLAMO_LOG("is_portrait:%d\n", is_portrait);
 
 	switch (rotation) {
-		case RR_Rotate_0 :
+		case RR_Rotate_0:
 			var.rotate = FB_ROTATE_UR;
 			break;
 		case RR_Rotate_90:
@@ -344,11 +345,12 @@ glamoSetScannoutGeometry (ScreenPtr pScreen,
 
 	if ((is_portrait && (var.rotate == FB_ROTATE_CW
 			    || var.rotate == FB_ROTATE_CCW))
-	    ||!is_portrait && (var.rotate == FB_ROTATE_UR
-				    || var.rotate == FB_ROTATE_UD)) {
+	    ||(!is_portrait) && (var.rotate == FB_ROTATE_UR
+			       || var.rotate == FB_ROTATE_UD)) {
 		orientation_will_change = TRUE;
 	}
-	GLAMO_LOG("will orientation change ?:%d\n", orientation_will_change);
+	GLAMO_LOG("will orientation change ?:%d\n",
+		  orientation_will_change);
 	if (orientation_will_change) {
 		KdMonitorTiming *t = NULL;
 		if (glamoFindMatchingMode(var.yres, var.xres, &t) && t) {
@@ -427,7 +429,7 @@ GLAMORandRSetConfig (ScreenPtr		pScreen,
 		KdDisableScreen(pScreen);
 	}
 	if (pScreen->width * pScreen->height
-	    != size->width * pScreen->height) {
+	    != size->width * size->height) {
 		/*resolution changes*/
 		glamoSetLCDResolution(size->width, size->height);
 	}
@@ -473,12 +475,10 @@ GLAMORandRGetInfo(ScreenPtr pScreen, Rotation *rotations)
 		{0, 0}
 	};
 
-	printf("in getconfig\n");
 	GLAMO_LOG("enter\n");
 
 	*rotations = RR_Rotate_All|RR_Reflect_All;
 
-	*rotations = RR_Rotate_All|RR_Reflect_All;
 	for (i=0; i < TAB_LEN(sizes); ++i) {
 		if (sizes[i].width == 0 || sizes[i].height == 0) {
 			continue;
@@ -507,9 +507,13 @@ GLAMORandRGetInfo(ScreenPtr pScreen, Rotation *rotations)
 	size = RRRegisterSize(pScreen,
 			      screen->width, screen->height,
 			      screen->width_mm, screen->height_mm);
-	RRSetCurrentConfig(pScreen, screen->randr, 0, size);
+	RRSetCurrentConfig(pScreen,
+			   screen->randr,
+			   size->pRates[0].rate,
+			   size);
 
-	GLAMO_LOG("leave\n");
+	GLAMO_LOG("leave. current size:(%dx%d)\n",
+                  size->width, size->height);
 
 	return TRUE;
 }
@@ -530,7 +534,7 @@ GLAMORandRInit (ScreenPtr pScreen)
 
 	return TRUE;
 }
-#endif
+#endif /*RANDR*/
 
 static void
 GLAMOScreenFini(KdScreenInfo *screen)
