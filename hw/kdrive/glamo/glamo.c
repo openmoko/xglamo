@@ -351,6 +351,20 @@ glamoSetScannoutGeometry (ScreenPtr pScreen,
 	}
 	GLAMO_LOG("will orientation change ?:%d\n",
 		  orientation_will_change);
+
+	/*
+	 * if we want to get back to "normal" (portrait) orientation
+	 * from landscape orientation, then it means we need to
+	 * get back to set
+	 */
+	if (orientation_will_change
+	    && !is_portrait
+	    && (var.rotate == FB_ROTATE_UR || FB_ROTATE_UD)) {
+		var.xres = size->height;
+		var.yres = size->width;
+		GLAMO_LOG("getting back to portrait. geo:(%dx%d),r:%d\n",
+			  var.xres, var.yres, var.rotate);
+	}
 	if (orientation_will_change) {
 		KdMonitorTiming *t = NULL;
 		if (glamoFindMatchingMode(var.yres, var.xres, &t) && t) {
