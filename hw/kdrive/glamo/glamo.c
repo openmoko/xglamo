@@ -302,6 +302,7 @@ glamoSetScannoutGeometry (ScreenPtr pScreen,
 	int byte_stride=0, k = 0, is_ok = FALSE;
 	KdMouseMatrix m;
 	Bool is_portrait = TRUE, orientation_will_change = FALSE;
+        int new_xres = 0, new_yres = 0;
 
 	GLAMO_LOG("enter: Absolute rotation to honour:%d\n", rotation);
 
@@ -352,22 +353,32 @@ glamoSetScannoutGeometry (ScreenPtr pScreen,
 	GLAMO_LOG("will orientation change ?:%d\n",
 		  orientation_will_change);
 
+	if (orientation_will_change) {
+		new_xres = var.yres;
+		new_yres = var.xres;
+	} else {
+		new_xres = var.xres;
+		new_yres = var.yres;
+	}
+
 	/*
 	 * if we want to get back to "normal" (portrait) orientation
 	 * from landscape orientation, then it means we need to
-	 * get back to set
+	 * to set orientation back to portrait ourselves.
 	 */
 	if (orientation_will_change
 	    && !is_portrait
 	    && (var.rotate == FB_ROTATE_UR || FB_ROTATE_UD)) {
 		var.xres = size->height;
 		var.yres = size->width;
+		new_xres = var.xres;
+		new_yres = var.yres;
 		GLAMO_LOG("getting back to portrait. geo:(%dx%d),r:%d\n",
 			  var.xres, var.yres, var.rotate);
 	}
 	if (orientation_will_change) {
 		KdMonitorTiming *t = NULL;
-		if (glamoFindMatchingMode(var.yres, var.xres, &t) && t) {
+		if (glamoFindMatchingMode(new_xres, new_yres, &t) && t) {
 			struct fb_var_screeninfo mode;
 			memset(&mode, 0, sizeof(mode));
 			glamoConvertMonitorTiming(t, &mode);
