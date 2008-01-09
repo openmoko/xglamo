@@ -293,9 +293,23 @@ GLAMODrawInit(ScreenPtr pScreen)
 {
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
+	KdScreenInfo *screen = pScreenPriv->screen;
+	int offscreen_memory_size = 0;  
 
-	ErrorF("Screen: %d/%d depth/bpp\n", pScreenPriv->screen->fb[0].depth,
-	    pScreenPriv->screen->fb[0].bitsPerPixel);
+	LogMessage(X_INFO, "Screen: %d/%d depth/bpp\n",
+		  pScreenPriv->screen->fb[0].depth,
+		  pScreenPriv->screen->fb[0].bitsPerPixel);
+
+	offscreen_memory_size =
+            screen->memory_size - screen->off_screen_base;
+
+	LogMessage(X_INFO,
+		   "vram size:%d, "
+		   "onscreen vram size:%d, "
+		   "offscreen vram size:%d\n",
+		   screen->memory_size,
+		   screen->off_screen_base,
+		   offscreen_memory_size);
 
 	RegisterBlockAndWakeupHandlers(GLAMOBlockHandler, GLAMOWakeupHandler,
 	    pScreen);
@@ -308,11 +322,10 @@ GLAMODrawInit(ScreenPtr pScreen)
 	glamos->kaa.PrepareCopy = GLAMOPrepareCopy;
 	glamos->kaa.Copy = GLAMOCopy;
 	glamos->kaa.DoneCopy = GLAMODoneCopy;
-	/* Other acceleration will be hooked in in DrawEnable depending on
-	 * what type of DMA gets initialized.
-	 */
 
-	glamos->kaa.flags = KAA_OFFSCREEN_PIXMAPS;
+	if (offscreen_memory_size > 0) {
+		glamos->kaa.flags = KAA_OFFSCREEN_PIXMAPS;
+	}
 	glamos->kaa.offsetAlign = 0;
 	glamos->kaa.pitchAlign = 0;
 
