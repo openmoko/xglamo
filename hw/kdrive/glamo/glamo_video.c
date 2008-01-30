@@ -27,10 +27,16 @@
 #ifdef HAVE_CONFIG_H
 #include <kdrive-config.h>
 #endif
+
+#ifdef XV
+
+#define LOG_XVIDEO 0
+
 #include "glamo.h"
 #include "glamo_dma.h"
 #include "glamo_draw.h"
 #include "glamo-regs.h"
+#include "glamo-log.h"
 #include "kaa.h"
 
 #include <X11/extensions/Xv.h>
@@ -41,14 +47,15 @@
 #define SYS_PITCH_ALIGN(w) (((w) + 3) & ~3)
 #define VID_PITCH_ALIGN(w) (((w) + 1) & ~1)
 
-static Atom xvBrightness, xvSaturation;
+static Atom xvColorKey;
 
-#define IMAGE_MAX_WIDTH		2048
-#define IMAGE_MAX_HEIGHT	2048
+#define IMAGE_MAX_WIDTH		640
+#define IMAGE_MAX_HEIGHT	480
 
 static void
 GLAMOStopVideo(KdScreenInfo *screen, pointer data, Bool exit)
 {
+	/*
 	int i;
 
 	ScreenPtr pScreen = screen->pScreen;
@@ -61,26 +68,33 @@ GLAMOStopVideo(KdScreenInfo *screen, pointer data, Bool exit)
 			KdOffscreenFree (pScreen, pPortPriv->off_screen[i]);
 			pPortPriv->off_screen[i] = 0;
 		}
+	*/
 }
 
 static int
 GLAMOSetPortAttribute(KdScreenInfo *screen, Atom attribute, int value,
-    pointer data)
+                      pointer data)
 {
 	return BadMatch;
 }
 
 static int
 GLAMOGetPortAttribute(KdScreenInfo *screen, Atom attribute, int *value,
-    pointer data)
+                      pointer data)
 {
 	return BadMatch;
 }
 
 static void
-GLAMOQueryBestSize(KdScreenInfo *screen, Bool motion, short vid_w, short vid_h,
-    short drw_w, short drw_h, unsigned int *p_w, unsigned int *p_h,
-    pointer data)
+GLAMOQueryBestSize(KdScreenInfo *screen,
+		   Bool motion,
+		   short vid_w,
+		   short vid_h,
+		   short drw_w,
+		   short drw_h,
+		   unsigned int *p_w,
+		   unsigned int *p_h,
+		   pointer data)
 {
 	*p_w = drw_w;
 	*p_h = drw_h;
@@ -97,7 +111,7 @@ GLAMOQueryBestSize(KdScreenInfo *screen, Bool motion, short vid_w, short vid_h,
 
 static void
 GLAMOClipVideo(BoxPtr dst, INT32 *x1, INT32 *x2, INT32 *y1, INT32 *y2,
-    BoxPtr extents, INT32 width, INT32 height)
+	       BoxPtr extents, INT32 width, INT32 height)
 {
 	INT32 vscale, hscale, delta;
 	int diff;
@@ -154,111 +168,6 @@ GLAMOClipVideo(BoxPtr dst, INT32 *x1, INT32 *x2, INT32 *y1, INT32 *y2,
 }
 
 static void
-GlamoDisplayVideo(KdScreenInfo *screen, GLAMOPortPrivPtr pPortPriv)
-{
-	ScreenPtr pScreen = screen->pScreen;
-	KdScreenPriv(pScreen);
-	GLAMOScreenInfo(pScreenPriv);
-	PixmapPtr pPixmap = pPortPriv->pPixmap;
-	CARD32 dst_offset, dst_pitch, *offsets;
-	int dstxoff, dstyoff;
-	RING_LOCALS;
-
-	BoxPtr pBox = REGION_RECTS(&pPortPriv->clip);
-	int nBox = REGION_NUM_RECTS(&pPortPriv->clip);
-	int en3;
-
-	dst_offset = ((CARD8 *)pPixmap->devPrivate.ptr -
-	    pScreenPriv->screen->memory_base);
-	dst_pitch = pPixmap->devKind;
-
-#ifdef COMPOSITE
-	dstxoff = -pPixmap->screen_x + pPixmap->drawable.x;
-	dstyoff = -pPixmap->screen_y + pPixmap->drawable.y;
-#else
-	dstxoff = 0;
-	dstyoff = 0;
-#endif
-
-	en3 = GLAMO_ISP_EN3_PLANE_MODE |
-	      GLAMO_ISP_EN3_YUV_INPUT |
-	      GLAMO_ISP_EN3_YUV420;
-	en3 |= GLAMO_ISP_EN3_SCALE_IMPROVE;
-
-	BEGIN_CMDQ(8);
-
-	OUT_REG(GLAMO_REG_ISP_EN3, en3);
-	OUT_REG(GLAMO_REG_ISP_DEC_PITCH_Y, pPortPriv->src_pitch1 & 0x1fff);
-	OUT_REG(GLAMO_REG_ISP_DEC_PITCH_UV, pPortPriv->src_pitch2 & 0x1fff);
-	OUT_REG(GLAMO_REG_ISP_PORT1_DEC_PITCH, dst_pitch & 0x1fff);
-
-	END_CMDQ();
-
-	offsets = pPortPriv->src_offsets[pPortPriv->idx];
-
-	while (nBox--) {
-		int srcX, srcY, dstX, dstY, srcw, srch, dstw, dsth, scale;
-		CARD32 srcO, dstO;
-
-		dstX = pBox->x1 + dstxoff;
-		dstY = pBox->y1 + dstyoff;
-		dstw = pBox->x2 - pBox->x1;
-		dsth = pBox->y2 - pBox->y1;
-		srcX = (pBox->x1 - pPortPriv->dst_x1) *
-		    pPortPriv->src_w / pPortPriv->dst_w;
-		srcY = (pBox->y1 - pPortPriv->dst_y1) *
-		    pPortPriv->src_h / pPortPriv->dst_h;
-		srcw = pPortPriv->src_w - srcX; /* XXX */
-		srch = pPortPriv->src_h - srcY; /* XXX */
-
-		GLAMOEngineWait(pScreen, GLAMO_ENGINE_ISP);
-
-		BEGIN_CMDQ(16);
-		srcO = offsets[0] + srcY * pPortPriv->src_pitch1 + srcX;
-		OUT_REG(GLAMO_REG_ISP_DEC_Y_ADDRL, srcO & 0xffff);
-		OUT_REG(GLAMO_REG_ISP_DEC_Y_ADDRH, (srcO >> 16) & 0x7f);
-
-		srcO = offsets[1] + srcY * pPortPriv->src_pitch2 + srcX;
-		OUT_REG(GLAMO_REG_ISP_DEC_U_ADDRL, srcO & 0xffff);
-		OUT_REG(GLAMO_REG_ISP_DEC_U_ADDRH, (srcO >> 16) & 0x7f);
-
-		srcO = offsets[2] + srcY * pPortPriv->src_pitch2 + srcX;
-		OUT_REG(GLAMO_REG_ISP_DEC_V_ADDRL, srcO & 0xffff);
-		OUT_REG(GLAMO_REG_ISP_DEC_V_ADDRH, (srcO >> 16) & 0x7f);
-
-		OUT_REG(GLAMO_REG_ISP_DEC_HEIGHT, srch & 0x1fff);
-		OUT_REG(GLAMO_REG_ISP_DEC_WIDTH, srcw & 0x1fff);
-		END_CMDQ();
-
-		BEGIN_CMDQ(16);
-		dstO = dst_offset + dstY * dst_pitch + dstX * 2;
-		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_0_ADDRL, dstO & 0xffff);
-		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_0_ADDRH, (dstO >> 16) & 0x7f);
-
-		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_WIDTH, dstw & 0x1fff);
-		OUT_REG(GLAMO_REG_ISP_PORT1_DEC_HEIGHT, dsth & 0x1fff);
-
-		scale = (srcw << 11) / dstw;
-		OUT_REG(GLAMO_REG_ISP_DEC_SCALEH, scale);
-
-		scale = (srch << 11) / dsth;
-		OUT_REG(GLAMO_REG_ISP_DEC_SCALEV, scale);
-
-		OUT_REG(GLAMO_REG_ISP_EN1, GLAMO_ISP_EN1_FIRE_ISP);
-		OUT_REG(GLAMO_REG_ISP_EN1, 0);
-
-		END_CMDQ();
-
-		pBox++;
-	}
-#ifdef DAMAGEEXT
-	/* XXX: Shouldn't this be in kxv.c instead? */
-	DamageDamageRegion(pPortPriv->pDraw, &pPortPriv->clip);
-#endif
-	kaaMarkSync(pScreen);
-}
-
-static void
 GLAMOVideoSave(ScreenPtr pScreen, KdOffscreenArea *area)
 {
 	KdScreenPriv(pScreen);
@@ -266,6 +175,8 @@ GLAMOVideoSave(ScreenPtr pScreen, KdOffscreenArea *area)
 	GLAMOPortPrivPtr pPortPriv = glamos->pAdaptor->pPortPrivates[0].ptr;
 	int i;
 
+	GLAMO_LOG("mark\n");
+	/*
 	for (i = 0; i < GLAMO_VIDEO_NUM_BUFS; i++)
 		if (pPortPriv->off_screen[i] == area)
 		{
@@ -273,305 +184,491 @@ GLAMOVideoSave(ScreenPtr pScreen, KdOffscreenArea *area)
 
 			break;
 		}
+		*/
 }
 
-static int
-GLAMOUploadImage(KdScreenInfo *screen, DrawablePtr pDraw,
-		 GLAMOPortPrivPtr pPortPriv,
-		 short src_x, short src_y,
-		 short src_w, short src_h,
-		 int id,
-		 int randr,
-		 unsigned char *buf,
-		 short width, short height)
+static Bool
+GetYUVFrameByteSize (int fourcc_code,
+		     unsigned short width,
+		     unsigned short height,
+		     unsigned int *size)
 {
-	CARD32 *offsets;
-	int srcPitch1, srcPitch2, dstPitch1, dstPitch2;
-	int src_x2, src_y2, size;
-	int idx;
+	if (!size)
+		return FALSE;
+	switch (fourcc_code) {
+		case FOURCC_YV12:
+		case FOURCC_I420:
+			*size = width*height * 3 / 2 ;
+			break;
+		default:
+			return FALSE;
+	}
+	return TRUE;
 
-	src_x2 = src_x + src_w;
-	src_y2 = src_y + src_h;
+}
 
-	src_x &= ~1;
-	src_y &= ~1;
-	src_w  = (src_x2 - src_x + 1) & ~1;
-	src_h  = (src_y2 - src_y + 1) & ~1;
+Bool
+GetUVFrameAddresses (int fourcc_code,
+		     unsigned short frame_width,
+		     unsigned short frame_height,
+		     unsigned int y_addr,
+		     unsigned int *u_addr,
+		     unsigned int *v_addr)
+{
+	Bool is_ok = FALSE;
 
-	switch (id) {
-	case FOURCC_YV12:
-	case FOURCC_I420:
-		srcPitch1 = SYS_PITCH_ALIGN(width);
-		srcPitch2 = SYS_PITCH_ALIGN(width / 2);
-		dstPitch1 = VID_PITCH_ALIGN(src_w);
-		dstPitch2 = VID_PITCH_ALIGN(src_w / 2);
-		size = (dstPitch1 + dstPitch2) * src_h;
-		break;
-	case FOURCC_UYVY:
-	case FOURCC_YUY2:
-	default:
-		srcPitch1 = width << 1;
-		srcPitch2 = 0;
-		dstPitch1 = src_w << 1;
-		dstPitch2 = 0;
-		size = dstPitch1 * src_h;
-		break;
+	if (!u_addr || !v_addr) {
+		GLAMO_LOG("failed sanity check\n");
+		goto out;
 	}
 
-	idx = pPortPriv->idx;
-	//ErrorF("uploading to buffer %d\n", idx);
+#if LOG_XVIDEO
+	GLAMO_LOG("enter: frame(%dx%d), y_addr:%#x\n",
+		  frame_width, frame_height,
+		  y_addr);
+#endif
 
-	if (!pPortPriv->off_screen[idx] ||
-	    size > pPortPriv->off_screen[idx]->size) {
-		if (pPortPriv->off_screen[idx])
-			KdOffscreenFree(screen->pScreen,
-					pPortPriv->off_screen[idx]);
-
-		pPortPriv->off_screen[idx] =
-			KdOffscreenAlloc(screen->pScreen,
-					 size, VID_PITCH_ALIGN(1), TRUE,
-					 GLAMOVideoSave, pPortPriv);
-		if (!pPortPriv->off_screen[idx])
-			return BadAlloc;
+	switch (fourcc_code) {
+		case FOURCC_YV12:
+			*v_addr = y_addr + frame_width*frame_height;
+			*u_addr = *v_addr + frame_width*frame_height/2;
+			is_ok = TRUE;
+			break;
+		case FOURCC_I420:
+			*u_addr = y_addr + frame_width*frame_height;
+			*v_addr = *u_addr + frame_width*frame_height/2;
+			is_ok = TRUE;
+			break;
+		default:
+			is_ok = FALSE;
+			break;
 	}
+#if LOG_XVIDEO
+	GLAMO_LOG("u_addr:%#x, v_addr:%#x\n",
+		  *u_addr, *v_addr);
+#endif
+out:
+#if LOG_XVIDEO
+	GLAMO_LOG("leave. is_ok:%d\n",
+		  is_ok);
+#endif
+	return is_ok;
+}
 
-	if (pDraw->type == DRAWABLE_WINDOW)
-		pPortPriv->pPixmap =
-		    (*screen->pScreen->GetWindowPixmap)((WindowPtr)pDraw);
-	else
-		pPortPriv->pPixmap = (PixmapPtr)pDraw;
+/**
+ * copy a portion of the YUV frame "src_frame" to a destination in memory.
+ * The portion to copy is a rectangle located at (src_x,src_y),
+ * of size (rect_width,rect_height).
+ *
+ * @src_frame pointer to the start of the YUV frame to consider
+ * @frame_width width of the YUV frame
+ * @frame_height height of the YUV frame
+ * @src_x
+ * @src_y
+ * @rect_width
+ * @rect_height
+ */
+static Bool
+CopyYUVPlanarFrameRect (const char *src_frame,
+			int fourcc_code,
+			unsigned short frame_width,
+			unsigned short frame_height,
+			unsigned short src_x,
+			unsigned short src_y,
+			unsigned short rect_width,
+			unsigned short rect_height,
+			char *destination)
+{
+	char *y_copy_src, *u_copy_src, *v_copy_src,
+		*y_copy_dst, *u_copy_dst, *v_copy_dst;
+	unsigned line;
+	Bool is_ok = FALSE;
 
-	/* Migrate the pixmap to offscreen if necessary. */
-	if (!kaaPixmapIsOffscreen(pPortPriv->pPixmap))
-		kaaMoveInPixmap(pPortPriv->pPixmap);
+#if LOG_XVIDEO
+	GLAMO_LOG("enter. src_frame:%#x, code:%#x\n"
+		  "frame(%d,%d)-(%dx%d), crop(%dx%d)\n"
+		  "dest:%#x",
+		  (unsigned)src_frame, (unsigned)fourcc_code,
+		  src_x, src_y, frame_width, frame_height,
+		  rect_width, rect_height, (unsigned)destination);
+#endif
 
-	if (!kaaPixmapIsOffscreen(pPortPriv->pPixmap))
-		return BadAlloc;
+	switch (fourcc_code) {
+		case FOURCC_YV12:
+		case FOURCC_I420:
+			/*planar yuv formats of the 4:2:0 family*/
+			y_copy_src = (char*) src_frame + src_x +
+					frame_width*src_y;
+			u_copy_src = (char*) src_frame +
+					frame_width*frame_height +
+					src_x/2 + frame_width*src_y/2;
+			v_copy_src = (char*) src_frame +
+				frame_width*frame_height*5/4 + src_x/2 +
+				frame_width/2*src_y;
+			y_copy_dst = destination;
+			u_copy_dst = destination + rect_width*rect_height;
+			v_copy_dst = destination + rect_width*rect_height*3/2;
+#if LOG_XVIDEO
+			GLAMO_LOG("y_copy_src:%#x, "
+				  "u_copy_src:%#x, "
+				  "v_copy_src:%#x\n"
+				  "y_copy_dst:%#x, "
+				  "u_copy_dst:%#x, "
+				  "v_copy_dst:%#x\n",
+				  (unsigned)y_copy_src,
+				  (unsigned)u_copy_src,
+				  (unsigned)v_copy_src,
+				  (unsigned)y_copy_dst,
+				  (unsigned)u_copy_dst,
+				  (unsigned)v_copy_dst);
+#endif
+			for (line = 0; line < rect_height; line++) {
+#if LOG_XVIDEO
+				GLAMO_LOG("============\n"
+					  "line:%d\n"
+					  "============\n",
+					  line);
+				GLAMO_LOG("y_copy_src:%#x, "
+					  "y_copy_dst:%#x, ",
+					  (unsigned)y_copy_src,
+					  (unsigned)y_copy_dst);
+#endif
 
-	pPortPriv->pDraw = pDraw;
+				memcpy(y_copy_dst,
+				       y_copy_src,
+				       rect_width);
+				y_copy_src += frame_width;
+				y_copy_dst += rect_width;
 
-	offsets = pPortPriv->src_offsets[idx];
-	offsets[0] = pPortPriv->off_screen[idx]->offset;
-	offsets[1] = offsets[0] + dstPitch1 * src_h;
-	offsets[2] = offsets[1] + dstPitch2 * src_h / 2;
-	pPortPriv->src_pitch1 = dstPitch1;
-	pPortPriv->src_pitch2 = dstPitch2;
-	pPortPriv->size[idx] = size;
-
-	/* copy data */
-	switch (id) {
-	case FOURCC_YV12:
-	case FOURCC_I420:
-		{
-			CARD8 *src1, *src2, *src3;
-			CARD8 *dst1, *dst2, *dst3;
-			int i;
-
-			src1 = buf + (src_y * srcPitch1) + src_x;
-			src2 = buf + (height * srcPitch1) +
-				(src_y * srcPitch2) + src_x / 2;
-			src3 = src2 + height * srcPitch2 / 2;
-
-			dst1 = (CARD8 *) (screen->memory_base + offsets[0]);
-
-			if (id == FOURCC_I420) {
-				dst2 = (CARD8 *) (screen->memory_base +
-						  offsets[1]);
-				dst3 = (CARD8 *) (screen->memory_base +
-						  offsets[2]);
-			} else {
-				dst2 = (CARD8 *) (screen->memory_base +
-						  offsets[2]);
-				dst3 = (CARD8 *) (screen->memory_base +
-						  offsets[1]);
-			}
-
-			for (i = 0; i < src_h; i++) {
-				memcpy(dst1, src1, src_w);
-				src1 += srcPitch1;
-				dst1 += dstPitch1;
-
-				if (!(i & 1)) {
-					memcpy(dst2, src2, src_w / 2);
-					memcpy(dst3, src3, src_w / 2);
-
-					src2 += srcPitch2;
-					dst2 += dstPitch2;
-					src3 += srcPitch2;
-					dst3 += dstPitch2;
+				/*
+				 * one line out of two has chrominance (u,v)
+				 * sampling.
+				 */
+				if (!(line&1)) {
+#if LOG_XVIDEO
+					GLAMO_LOG("u_copy_src:%#x, "
+						  "u_copy_dst:%#x\n",
+						  (unsigned)u_copy_src,
+						  (unsigned)u_copy_dst);
+#endif
+					memcpy(u_copy_dst,
+					       u_copy_src,
+					       rect_width/2);
+#if LOG_XVIDEO
+					GLAMO_LOG("v_copy_src:%#x, "
+						  "v_copy_dst:%#x\n",
+						  (unsigned)v_copy_src,
+						  (unsigned)v_copy_dst);
+#endif
+					memcpy(v_copy_dst,
+					       v_copy_src,
+					       rect_width/2);
+					u_copy_src += frame_width/2;
+					u_copy_dst += rect_width/2;
+					v_copy_src += frame_width/2;
+					v_copy_dst += rect_width/2;
 				}
 			}
-		}
-		break;
-	case FOURCC_UYVY:
-	case FOURCC_YUY2:
-	default:
-		KdXVCopyPackedData(screen, buf,
-				(CARD8 *)(screen->memory_base + offsets[0]),
-				randr, srcPitch1, dstPitch1,
-				src_w, src_h, src_y, src_x, src_h, src_w);
-		break;
+			break;
+		default:
+			/*
+			 * glamo 3362 only supports YUV 4:2:0 planar formats.
+			 */
+			is_ok = FALSE;
+			goto out;
+	}
+	is_ok = TRUE;
+out:
+#if LOG_XVIDEO
+	GLAMO_LOG("leave.is_ok:%d\n", is_ok);
+#endif
+	return is_ok;
+}
+
+static Bool
+GLAMOVideoUploadFrameToOffscreen (KdScreenInfo *screen,
+				  unsigned char *yuv_frame,
+				  int fourcc_code,
+				  unsigned yuv_frame_width,
+				  unsigned yuv_frame_height,
+				  short src_x, short src_y,
+				  short src_w, short src_h,
+				  GLAMOPortPrivPtr portPriv,
+				  unsigned int *out_offscreen_frame)
+{
+	int idx = 0;
+	unsigned size = 0;
+	Bool is_ok = FALSE;
+	ScreenPtr pScreen = screen->pScreen;
+	char *offscreen_frame = NULL;
+
+#if LOG_XVIDEO
+	GLAMO_LOG("enter. frame(%dx%d), crop(%dx%d)\n",
+		  yuv_frame_width, yuv_frame_height,
+		  src_w, src_h);
+#endif
+
+	if (!GetYUVFrameByteSize (fourcc_code, src_w, src_h, &size)) {
+		GLAMO_LOG("failed to get frame size\n");
+		goto out;
 	}
 
-	return Success;
+	if (!portPriv->off_screen_yuv_buf
+	    || size < portPriv->off_screen_yuv_buf->size) {
+		if (portPriv->off_screen_yuv_buf) {
+			KdOffscreenFree(pScreen,
+					portPriv->off_screen_yuv_buf);
+		}
+		portPriv->off_screen_yuv_buf =
+			KdOffscreenAlloc(pScreen, size, VID_PITCH_ALIGN(2),
+					 TRUE, GLAMOVideoSave, portPriv);
+		if (!portPriv->off_screen_yuv_buf) {
+			GLAMO_LOG("failed to allocate offscreen memory\n");
+			goto out;
+		}
+		GLAMO_LOG("allocated %d bytes of offscreen memory\n", size);
+	}
+	offscreen_frame = screen->memory_base +
+				portPriv->off_screen_yuv_buf->offset;
+
+	if (out_offscreen_frame)
+		*out_offscreen_frame = portPriv->off_screen_yuv_buf->offset;
+
+	if (!CopyYUVPlanarFrameRect (yuv_frame, fourcc_code,
+				     yuv_frame_width, yuv_frame_height,
+				     src_x, src_y, src_w, src_h,
+				     offscreen_frame)) {
+		GLAMO_LOG("failed to copy yuv frame to offscreen memory\n");
+		goto out;
+	}
+
+	is_ok = TRUE;
+out:
+
+#if LOG_XVIDEO
+	GLAMO_LOG("leave:%d\n", is_ok);
+#endif
+	return is_ok;
+
+}
+
+static Bool
+GLAMOApplyClipBoxes(ScreenPtr pScreen,
+		    GLAMOPortPrivPtr portPriv,
+		    const RegionPtr clipBoxes,
+		    const DrawablePtr dst_drawable,
+		    unsigned short dst_w,
+		    unsigned short dst_h)
+{
+	Bool is_ok = FALSE;
+	int i = 0, num_clip_rects =0, depth = 0;
+	BoxPtr clip_extents = NULL;
+	BoxPtr clip_rect = NULL;
+	BoxRec full_box;
+	RegionRec full_region;
+	PixmapPtr dst_pixmap = NULL;
+	DrawablePtr overlay_drawable = NULL;
+	CARD32 overlay_pixmap_offset = 0;
+	CARD16 overlay_pitch = 0, overlay_width = 0, overlay_height = 0;
+	KdScreenPriv(pScreen);
+
+	GLAMO_RETURN_VAL_IF_FAIL (pScreen
+				  && portPriv
+				  && clipBoxes
+				  && dst_drawable,
+				  FALSE);
+
+	GLAMO_LOG("enter\n");
+
+	clip_extents = REGION_EXTENTS(pScreen, clipBoxes);
+	
+	num_clip_rects = REGION_NUM_RECTS (clipBoxes);
+	GLAMO_LOG("got %d clip rects\n", num_clip_rects);
+	for (i = 0, clip_rect = REGION_RECTS(clipBoxes);
+	     i < num_clip_rects;
+	     i++, clip_rect++) {
+		GLAMO_LOG("rect N%d:(%d,%d,%d,%d)\n",
+			  i, clip_rect->x1, clip_rect->y1,
+			  clip_rect->x2, clip_rect->y2);
+	}
+
+	if (dst_drawable->type == DRAWABLE_WINDOW) {
+		dst_pixmap =
+			(*pScreen->GetWindowPixmap)((WindowPtr)dst_drawable);
+	} else {
+		dst_pixmap = (PixmapPtr) dst_drawable;
+	}
+
+	if (portPriv->overlay_pixmap
+	    && (portPriv->overlay_pixmap->drawable.width < dst_w
+		||portPriv->overlay_pixmap->drawable.height < dst_h)) {
+		(*pScreen->DestroyPixmap)(portPriv->overlay_pixmap);
+		portPriv->overlay_pixmap = NULL;
+		GLAMO_LOG("destroyed overlay pixmap");
+	}
+	depth = pScreenPriv->screen->fb[0].depth;
+	if (!portPriv->overlay_pixmap) {
+		portPriv->overlay_pixmap =
+			(*pScreen->CreatePixmap) (pScreen,
+						  dst_w, dst_h,
+						  depth);
+		GLAMO_LOG("overlay pixmap info: (%dx%d):%d,@:%#x\n",
+			  dst_w, dst_h, depth,
+			  (char*)portPriv->overlay_pixmap->devPrivate.ptr);
+	}
+	if (!portPriv->overlay_pixmap) {
+		GLAMO_LOG_ERROR("failed to allocate overlay pixmap\n");
+		goto out;
+	}
+	if (!kaaPixmapIsOffscreen(portPriv->overlay_pixmap)) {
+		kaaMoveInPixmap(portPriv->overlay_pixmap);
+	}
+	if (!kaaPixmapIsOffscreen(portPriv->overlay_pixmap)) {
+		GLAMO_LOG_ERROR("failed to migrate overlay "
+				"pixmap to vram\n");
+		goto out;
+	}
+	/*
+	 * compute a couple of paramters that will be useful later.
+	 */
+	overlay_drawable = (DrawablePtr)portPriv->overlay_pixmap;
+	overlay_pixmap_offset =
+		(CARD8*)portPriv->overlay_pixmap->devPrivate.ptr
+		 - (CARD8*)pScreenPriv->screen->memory_base;
+	overlay_pitch = portPriv->overlay_pixmap->devKind/(depth/8);
+	overlay_width = abs(clip_extents->x2 - clip_extents->x1);
+	overlay_height = abs(clip_extents->y2 - clip_extents->y1);
+	full_box.x1 = full_box.y1 = 0;
+	full_box.x2 = full_box.x1 + overlay_drawable->width;
+	full_box.y2 = full_box.y1 + overlay_drawable->height;
+	REGION_INIT(pScreen, &full_region, &full_box, 0);
+	/*
+	 * first repaint the whole overlay pixmap in black, i.e,
+	 * different from colorkey.
+	 * That is a kind of reinitialisation of the overlay area
+	 */
+	KXVPaintRegion (overlay_drawable, &full_region, 0);
+	REGION_UNINIT(pScreen, &full_region);
+	/*
+	 * now draw the clipping region in the overlay pixmap using the
+	 * colorkey as foreground
+	 */
+	KXVPaintRegion (overlay_drawable, clipBoxes, portPriv->color_key);
+
+	/*tell the ISP about the color kay overlay.*/
+	GLAMOISPSetColorKeyOverlay2(pScreen, overlay_pixmap_offset,
+				    clip_extents->x1, clip_extents->y1,
+				    overlay_width,
+				    overlay_height,
+				    overlay_pitch,
+				    portPriv->color_key);
+
+	is_ok = TRUE;
+
+out:
+	GLAMO_LOG("leave\n");
+	return is_ok;
 }
 
 static int
-GLAMOPutImage(KdScreenInfo *screen, DrawablePtr pDraw,
-	       short src_x, short src_y,
-	       short drw_x, short drw_y,
-	       short src_w, short src_h,
-	       short drw_w, short drw_h,
-	       int id,
-	       unsigned char *buf,
-	       short width,
-	       short height,
-	       Bool sync,
-	       RegionPtr clipBoxes,
-	       pointer data)
+GLAMOPutImage(KdScreenInfo *screen, DrawablePtr dst_drawable,
+	      short src_x, short src_y,
+	      short drw_x, short drw_y,
+	      short src_w, short src_h,
+	      short drw_w, short drw_h,
+	      int id,
+	      unsigned char *buf,
+	      short width,
+	      short height,
+	      Bool sync,
+	      RegionPtr clipBoxes,
+	      pointer data)
 {
 	ScreenPtr pScreen = screen->pScreen;
 	KdScreenPriv(pScreen);
 	GLAMOCardInfo(pScreenPriv);
-	GLAMOPortPrivPtr pPortPriv = (GLAMOPortPrivPtr)data;
-	char *mmio = glamoc->reg_base;
+	GLAMOPortPrivPtr portPriv = (GLAMOPortPrivPtr)data;
 	INT32 x1, x2, y1, y2;
-	int randr = RR_Rotate_0 /* XXX */;
-	int top, left, npixels, nlines;
-	BoxRec dstBox;
-	int dst_width = width, dst_height = height;
-	int rot_x1, rot_y1, rot_x2, rot_y2;
-	int dst_x1, dst_y1, dst_x2, dst_y2;
-	int rot_src_w, rot_src_h, rot_drw_w, rot_drw_h;
+	short scale_w, scale_h;
+	unsigned int offscreen_frame_addr = 0,
+		y_addr, u_addr, v_addr, dst_addr;
+	PixmapPtr dst_pixmap;
 
-	/* Clip */
+#if LOG_XVIDEO
+	GLAMO_LOG("enter. id:%#x, frame:(%dx%d) srccrop:(%d,%d)-(%dx%d)\n"
+		  "dst geo:(%d,%d)-(%dx%d)\n",
+		  id, width, height, src_x, src_y, src_w, src_h,
+		  drw_x, drw_y, drw_w, drw_h);
+#endif
+
+	if (!GLAMOApplyClipBoxes(pScreen, portPriv,
+				 clipBoxes,
+				 dst_drawable,
+				 drw_w, drw_h)) {
+		GLAMO_LOG_ERROR("failed to apply clipboxes\n");
+		return BadImplementation;
+	}
+
 	x1 = src_x;
 	x2 = src_x + src_w;
 	y1 = src_y;
 	y2 = src_y + src_h;
 
-	dstBox.x1 = drw_x;
-	dstBox.x2 = drw_x + drw_w;
-	dstBox.y1 = drw_y;
-	dstBox.y2 = drw_y + drw_h;
-
-	GLAMOClipVideo(&dstBox, &x1, &x2, &y1, &y2,
-	    REGION_EXTENTS(pScreen, clipBoxes), width, height);
-
-	src_w = (x2 - x1) >> 16;
-	src_h = (y2 - y1) >> 16;
-	drw_w = dstBox.x2 - dstBox.x1;
-	drw_h = dstBox.y2 - dstBox.y1;
-
-	if ((x1 >= x2) || (y1 >= y2))
-		return Success;
-
-	if (mmio == NULL)
-		return BadAlloc;
-
-	if (randr & (RR_Rotate_0|RR_Rotate_180)) {
-		dst_width = width;
-		dst_height = height;
-		rot_src_w = src_w;
-		rot_src_h = src_h;
-		rot_drw_w = drw_w;
-		rot_drw_h = drw_h;
-	} else {
-		dst_width = height;
-		dst_height = width;
-		rot_src_w = src_h;
-		rot_src_h = src_w;
-		rot_drw_w = drw_h;
-		rot_drw_h = drw_w;
-	}
-
-	switch (randr & RR_Rotate_All) {
-	case RR_Rotate_0:
-	default:
-		dst_x1 = dstBox.x1;
-		dst_y1 = dstBox.y1;
-		dst_x2 = dstBox.x2;
-		dst_y2 = dstBox.y2;
-		rot_x1 = x1;
-		rot_y1 = y1;
-		rot_x2 = x2;
-		rot_y2 = y2;
-		break;
-	case RR_Rotate_90:
-		dst_x1 = dstBox.y1;
-		dst_y1 = screen->height - dstBox.x2;
-		dst_x2 = dstBox.y2;
-		dst_y2 = screen->height - dstBox.x1;
-		rot_x1 = y1;
-		rot_y1 = (src_w << 16) - x2;
-		rot_x2 = y2;
-		rot_y2 = (src_w << 16) - x1;
-		break;
-	case RR_Rotate_180:
-		dst_x1 = screen->width - dstBox.x2;
-		dst_y1 = screen->height - dstBox.y2;
-		dst_x2 = screen->width - dstBox.x1;
-		dst_y2 = screen->height - dstBox.y1;
-		rot_x1 = (src_w << 16) - x2;
-		rot_y1 = (src_h << 16) - y2;
-		rot_x2 = (src_w << 16) - x1;
-		rot_y2 = (src_h << 16) - y1;
-		break;
-	case RR_Rotate_270:
-		dst_x1 = screen->width - dstBox.y2;
-		dst_y1 = dstBox.x1;
-		dst_x2 = screen->width - dstBox.y1;
-		dst_y2 = dstBox.x2;
-		rot_x1 = (src_h << 16) - y2;
-		rot_y1 = x1;
-		rot_x2 = (src_h << 16) - y1;
-		rot_y2 = x2;
-		break;
-	}
-
-	top = rot_y1 >> 16;
-	left = rot_x1 >> 16;
-	npixels = ((rot_x2 + 0xffff) >> 16) - left;
-	nlines  = ((rot_y2 + 0xffff) >> 16) - top;
-
 	/*
-	 * We kaaWaitSync below.  This guarantees only one buffer
-	 * is locked by ISP.  Thus, if ISP is busy, the buffer
-	 * knext is free.
-	 *
-	 * This is a simple scheme.  Only dual buffer benefits.
+	 * upload the YUV frame to offscreen vram so that GLAMO can
+	 * later have access to it and blit it from offscreen vram to
+	 * onscreen vram.
 	 */
-	if (GLAMOEngineBusy(pScreen, GLAMO_ENGINE_ISP))
-		pPortPriv->idx = (pPortPriv->idx + 1) % GLAMO_VIDEO_NUM_BUFS;
-
-	if (GLAMOUploadImage(screen, pDraw, pPortPriv,
-			     left, top, npixels, nlines,
-			     id, randr, buf, width, height))
+	if (!GLAMOVideoUploadFrameToOffscreen(screen, buf, id,
+					      width, height,
+					      x1, y1, src_w, src_h,
+					      portPriv,
+					      &offscreen_frame_addr)) {
+		GLAMO_LOG("failed to upload frame to offscreen\n");
 		return BadAlloc;
+	}
+#if LOG_XVIDEO
+	GLAMO_LOG("copied video frame to vram offset:%#x\n",
+		  offscreen_frame_addr);
+	GLAMO_LOG("y_pitch:%hd, crop(%hdx%hd)\n", src_w, src_w, src_h);
+#endif 
 
-	/* update cliplist */
-	if (!REGION_EQUAL(screen->pScreen, &pPortPriv->clip, clipBoxes)) {
-		REGION_COPY(screen->pScreen, &pPortPriv->clip, clipBoxes);
+
+	y_addr = offscreen_frame_addr;
+	if (!GetUVFrameAddresses (id, width, height,
+				  y_addr, &u_addr, &v_addr)) {
+		GLAMO_LOG("failed to compute");
+		return BadIDChoice;
+	}
+	if (dst_drawable->type == DRAWABLE_WINDOW) {
+		dst_pixmap =
+		(*screen->pScreen->GetWindowPixmap)((WindowPtr)dst_drawable);
+	} else {
+		dst_pixmap = (PixmapPtr)dst_drawable;
+	}
+	if (!dst_pixmap->devPrivate.ptr) {
+		GLAMO_LOG("dst pixmap should be in vram\n");
+		return BadImplementation;
 	}
 
-	pPortPriv->id = id;
-	pPortPriv->src_x1 = rot_x1;
-	pPortPriv->src_y1 = rot_y1;
-	pPortPriv->src_x2 = rot_x2;
-	pPortPriv->src_y2 = rot_y2;
-	pPortPriv->src_w = rot_src_w;
-	pPortPriv->src_h = rot_src_h;
-	pPortPriv->dst_x1 = dst_x1;
-	pPortPriv->dst_y1 = dst_y1;
-	pPortPriv->dst_x2 = dst_x2;
-	pPortPriv->dst_y2 = dst_y2;
-	pPortPriv->dst_w = rot_drw_w;
-	pPortPriv->dst_h = rot_drw_h;
+	dst_addr = (CARD8*)dst_pixmap->devPrivate.ptr - screen->memory_base +
+			drw_x + dst_pixmap->devKind*drw_y;
+	scale_w = src_w/drw_w;
+	scale_h = src_h/drw_h;
+#if LOG_XVIDEO
+	GLAMO_LOG("y_pitch:%hd, crop(%hdx%hd)\n", src_w, src_w, src_h);
+#endif
+	GLAMOISPDisplayYUVPlanarFrame(pScreen, y_addr, u_addr, v_addr,
+			              src_w/*y_pitch*/, src_w/2/*uv_pitch*/,
+				      src_w/*crop w*/, src_h/*crop h*/,
+				      dst_addr, dst_pixmap->devKind,
+				      drw_w, drw_h, scale_w, scale_h);
 
-	kaaWaitSync(pScreen);
-	GlamoDisplayVideo(screen, pPortPriv);
-
+#if LOG_XVIDEO
+	GLAMO_LOG("leave\n");
+#endif
 	return Success;
+
 }
 
 static int
@@ -580,45 +677,14 @@ GLAMOReputImage(KdScreenInfo *screen, DrawablePtr pDraw,
 {
 	ScreenPtr pScreen = screen->pScreen;
 	GLAMOPortPrivPtr	pPortPriv = (GLAMOPortPrivPtr)data;
-	BoxPtr pOldExtents = REGION_EXTENTS(screen->pScreen, &pPortPriv->clip);
-	BoxPtr pNewExtents = REGION_EXTENTS(screen->pScreen, clipBoxes);
-
-	if (pOldExtents->x1 != pNewExtents->x1 ||
-	    pOldExtents->x2 != pNewExtents->x2 ||
-	    pOldExtents->y1 != pNewExtents->y1 ||
-	    pOldExtents->y2 != pNewExtents->y2)
-		return BadMatch;
-
-	if (pDraw->type == DRAWABLE_WINDOW)
-		pPortPriv->pPixmap =
-		    (*pScreen->GetWindowPixmap)((WindowPtr)pDraw);
-	else
-		pPortPriv->pPixmap = (PixmapPtr)pDraw;
-
-	if (!kaaPixmapIsOffscreen(pPortPriv->pPixmap))
-		kaaMoveInPixmap(pPortPriv->pPixmap);
-
-	if (!kaaPixmapIsOffscreen(pPortPriv->pPixmap)) {
-		ErrorF("err\n");
-		return BadAlloc;
-	}
-
-
-	/* update cliplist */
-	if (!REGION_EQUAL(screen->pScreen, &pPortPriv->clip, clipBoxes))
-		REGION_COPY(screen->pScreen, &pPortPriv->clip, clipBoxes);
-
-	/* XXX: What do the drw_x and drw_y here mean for us? */
-
-	kaaWaitSync(pScreen);
-	GlamoDisplayVideo(screen, pPortPriv);
-
+	BoxPtr pOldExtents = REGION_EXTENTS(screen->pScreen,
+					    &pPortPriv->clip);
 	return Success;
 }
 
 static int
 GLAMOQueryImageAttributes(KdScreenInfo *screen, int id, unsigned short *w,
-    unsigned short *h, int *pitches, int *offsets)
+			  unsigned short *h, int *pitches, int *offsets)
 {
 	int size, tmp;
 
@@ -687,30 +753,16 @@ static KdVideoFormatRec Formats[NUM_FORMATS] =
 };
 
 #define NUM_ATTRIBUTES 0
-
 static KdAttributeRec Attributes[NUM_ATTRIBUTES] =
 {
 };
 
-#ifdef PACKED_IMAGE
-#define NUM_IMAGES 4
-
-static KdImageRec Images[NUM_IMAGES] =
-{
-	XVIMAGE_YUY2,
-	XVIMAGE_YV12,
-	XVIMAGE_I420,
-	XVIMAGE_UYVY
-};
-#else
-#define NUM_IMAGES 2
-
-static KdImageRec Images[NUM_IMAGES] =
+static KdImageRec Images[] =
 {
 	XVIMAGE_YV12,
 	XVIMAGE_I420,
 };
-#endif /* PACKED_IMAGE */
+#define NUM_IMAGES (sizeof(Images)/sizeof(Images[0]))
 
 static KdVideoAdaptorPtr
 GLAMOSetupImageVideo(ScreenPtr pScreen)
@@ -718,9 +770,10 @@ GLAMOSetupImageVideo(ScreenPtr pScreen)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 	KdVideoAdaptorPtr adapt;
-	GLAMOPortPrivPtr pPortPriv;
+	GLAMOPortPrivPtr portPriv;
 	int i;
 
+	GLAMO_LOG("enter\n");
 	glamos->num_texture_ports = 1;
 
 	adapt = xcalloc(1, sizeof(KdVideoAdaptorRec) +
@@ -731,7 +784,7 @@ GLAMOSetupImageVideo(ScreenPtr pScreen)
 
 	adapt->type = XvWindowMask | XvInputMask | XvImageMask;
 	adapt->flags = VIDEO_CLIP_TO_VIEWPORT;
-	adapt->name = "GLAMO Texture Video";
+	adapt->name = "GLAMO Video Overlay";
 	adapt->nEncodings = 1;
 	adapt->pEncodings = DummyEncoding;
 	adapt->nFormats = NUM_FORMATS;
@@ -739,11 +792,11 @@ GLAMOSetupImageVideo(ScreenPtr pScreen)
 	adapt->nPorts = glamos->num_texture_ports;
 	adapt->pPortPrivates = (DevUnion*)(&adapt[1]);
 
-	pPortPriv = (GLAMOPortPrivPtr)
+	portPriv = (GLAMOPortPrivPtr)
 		(&adapt->pPortPrivates[glamos->num_texture_ports]);
 
 	for (i = 0; i < glamos->num_texture_ports; i++)
-		adapt->pPortPrivates[i].ptr = &pPortPriv[i];
+		adapt->pPortPrivates[i].ptr = &portPriv[i];
 
 	adapt->nAttributes = NUM_ATTRIBUTES;
 	adapt->pAttributes = Attributes;
@@ -758,63 +811,80 @@ GLAMOSetupImageVideo(ScreenPtr pScreen)
 	adapt->GetPortAttribute = GLAMOGetPortAttribute;
 	adapt->QueryBestSize = GLAMOQueryBestSize;
 	adapt->PutImage = GLAMOPutImage;
-	adapt->ReputImage = GLAMOReputImage;
+	/*adapt->ReputImage = GLAMOReputImage;*/
 	adapt->QueryImageAttributes = GLAMOQueryImageAttributes;
 
-	for (i = 0; i < glamos->num_texture_ports; i++)
-		REGION_INIT(pScreen, &pPortPriv[i].clip, NullBox, 0);
+	for (i = 0; i < glamos->num_texture_ports; i++) {
+		REGION_INIT(pScreen, &portPriv[i].clip, NullBox, 0);
+		portPriv[i].color_key = 0xffff;
+	}
 
 	glamos->pAdaptor = adapt;
 
-	xvBrightness = MAKE_ATOM("XV_BRIGHTNESS");
-	xvSaturation = MAKE_ATOM("XV_SATURGLAMOON");
+	GLAMO_LOG("leave. adaptor:%#x\n", (unsigned)adapt);
 
 	return adapt;
 }
 
-Bool GLAMOInitVideo(ScreenPtr pScreen)
+Bool
+GLAMOInitVideo(ScreenPtr pScreen)
 {
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 	GLAMOCardInfo(pScreenPriv);
 	KdScreenInfo *screen = pScreenPriv->screen;
-	KdVideoAdaptorPtr *adaptors, *newAdaptors = NULL;
+	KdVideoAdaptorPtr *oldAdaptors = NULL, *newAdaptors = NULL;
 	KdVideoAdaptorPtr newAdaptor = NULL;
 	int num_adaptors;
+	Bool is_ok = FALSE;
+
+	GLAMO_LOG("enter\n");
 
 	glamos->pAdaptor = NULL;
 
-	if (glamoc->reg_base == NULL)
-		return FALSE;
+	if (glamoc->reg_base == NULL) {
+		GLAMO_LOG("glamoc->reg_base is null\n");
+		goto out;
+	}
 
-	num_adaptors = KdXVListGenericAdaptors(screen, &adaptors);
+	num_adaptors = KdXVListGenericAdaptors(screen, &oldAdaptors);
 
 	newAdaptor = GLAMOSetupImageVideo(pScreen);
 
 	if (newAdaptor)  {
 		if (!num_adaptors) {
 			num_adaptors = 1;
-			adaptors = &newAdaptor;
+			newAdaptors = &newAdaptor;
 		} else {
 			newAdaptors = xalloc((num_adaptors + 1) *
 			    sizeof(KdVideoAdaptorPtr *));
-			if (newAdaptors) {
-				memcpy(newAdaptors, adaptors, num_adaptors *
-				    sizeof(KdVideoAdaptorPtr));
-				newAdaptors[num_adaptors] = newAdaptor;
-				adaptors = newAdaptors;
-				num_adaptors++;
-			}
+			if (!newAdaptors)
+				goto out;
+
+			memcpy(newAdaptors,
+			       oldAdaptors,
+			       num_adaptors * sizeof(KdVideoAdaptorPtr));
+			newAdaptors[num_adaptors] = newAdaptor;
+			num_adaptors++;
 		}
 	}
 
+	GLAMOCMDQCacheSetup(pScreen);
+	GLAMOISPEngineInit(pScreen);
+
 	if (num_adaptors)
-		KdXVScreenInit(pScreen, adaptors, num_adaptors);
+		KdXVScreenInit(pScreen, newAdaptors, num_adaptors);
 
-	if (newAdaptors)
+	is_ok = TRUE;
+out:
+	GLAMO_LOG("leave. is_ok:%d, adaptors:%d\n",
+		  is_ok, num_adaptors);
+	/*
+	if (newAdaptors) {
 		xfree(newAdaptors);
-
-	return TRUE;
+	}
+	*/
+	return is_ok;
 }
 
 void
@@ -823,147 +893,33 @@ GLAMOFiniVideo(ScreenPtr pScreen)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 	KdVideoAdaptorPtr adapt = glamos->pAdaptor;
-	GLAMOPortPrivPtr pPortPriv;
+	GLAMOPortPrivPtr portPriv;
 	int i;
+
+	GLAMO_LOG ("enter\n");
 
 	if (!adapt)
 		return;
 
 	for (i = 0; i < glamos->num_texture_ports; i++) {
-		pPortPriv = (GLAMOPortPrivPtr)(adapt->pPortPrivates[i].ptr);
-		REGION_UNINIT(pScreen, &pPortPriv->clip);
+		portPriv = (GLAMOPortPrivPtr)(adapt->pPortPrivates[i].ptr);
+		GLAMO_LOG("freeing clipping region...\n");
+		REGION_UNINIT(pScreen, &portPriv->clip);
+		GLAMO_LOG("freed clipping region\n");
+#if 0
+		if (portPriv->off_screen_yuv_buf) {
+			GLAMO_LOG("freeing offscreen yuv buf...\n");
+			KdOffscreenFree(pScreen,
+					portPriv->off_screen_yuv_buf);
+			portPriv->off_screen_yuv_buf = NULL;
+			GLAMO_LOG("freeed offscreen yuv buf\n");
+		}
+#endif
+
 	}
 	xfree(adapt);
 	glamos->pAdaptor = NULL;
-}
-
-static void GLAMOSetOnFlyRegs(ScreenPtr pScreen)
-{
-	KdScreenPriv(pScreen);
-	GLAMOScreenInfo(pScreenPriv);
-	struct {
-		int src_block_x;
-		int src_block_y;
-		int src_block_w;
-		int src_block_h;
-		int jpeg_out_y;
-		int jpeg_out_x;
-		int fifo_full_cnt;
-		int in_length;
-		int fifo_data_cnt;
-		int in_height;
-	} onfly;
-	RING_LOCALS;
-
-	onfly.src_block_y = 32;
-	onfly.src_block_x = 32;
-	onfly.src_block_w = 36;
-	onfly.src_block_h = 35;
-	onfly.jpeg_out_y = 32;
-	onfly.jpeg_out_x = 32;
-	onfly.fifo_full_cnt = onfly.src_block_w * 2 + 2;
-	onfly.in_length = onfly.jpeg_out_x + 3;
-	onfly.fifo_data_cnt = onfly.src_block_w * onfly.src_block_h / 2;
-	onfly.in_height = onfly.jpeg_out_y + 2;
-
-	BEGIN_CMDQ(10);
-	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE1,
-		onfly.src_block_y << 10 | onfly.src_block_x << 2);
-	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE2,
-		onfly.src_block_h << 8 | onfly.src_block_w);
-	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE3,
-		onfly.jpeg_out_y << 8 | onfly.jpeg_out_x);
-	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE4,
-		onfly.fifo_full_cnt << 8 | onfly.in_length);
-	OUT_REG(GLAMO_REG_ISP_ONFLY_MODE5,
-		onfly.fifo_data_cnt << 6 | onfly.in_height);
-	END_CMDQ();
-}
-
-static void GLAMOSetWeightRegs(ScreenPtr pScreen)
-{
-	KdScreenPriv(pScreen);
-	GLAMOScreenInfo(pScreenPriv);
-	int left = 1 << 14;
-	RING_LOCALS;
-
-	/* nearest */
-
-	BEGIN_CMDQ(12);
-	OUT_BURST(GLAMO_REG_ISP_DEC_SCALEH_MATRIX, 10);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  0, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  2, 0);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  4, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  6, 0);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX +  8, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 10, 0);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 12, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 14, 0);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 16, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEH_MATRIX + 18, 0);
-	END_CMDQ();
-
-	BEGIN_CMDQ(12);
-	OUT_BURST(GLAMO_REG_ISP_DEC_SCALEV_MATRIX, 10);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  0, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  2, 0);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  4, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  6, 0);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX +  8, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 10, 0);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 12, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 14, 0);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 16, left);
-	OUT_BURST_REG(GLAMO_REG_ISP_DEC_SCALEV_MATRIX + 18, 0);
-	END_CMDQ();
-}
-
-static void GLAMOInitISP(ScreenPtr pScreen)
-{
-	KdScreenPriv(pScreen);
-	GLAMOScreenInfo(pScreenPriv);
-	RING_LOCALS;
-
-	BEGIN_CMDQ(16);
-
-	/*
-	 * In 8.8 fixed point,
-	 *
-	 *  R = Y + 1.402 (Cr-128)
-	 *    = Y + 0x0167 Cr - 0xb3
-	 *
-	 *  G = Y - 0.34414 (Cb-128) - 0.71414 (Cr-128)
-	 *    = Y - 0x0058 Cb - 0x00b6 Cr + 0x89
-	 *
-	 *  B = Y + 1.772 (Cb-128)
-	 *    = Y + 0x01c5 Cb - 0xe2
-	 */
-
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_11, 0x0167);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_21, 0x01c5);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_32, 0x00b6);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_33, 0x0058);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_RG, 0xb3 << 8 | 0x89);
-	OUT_REG(GLAMO_REG_ISP_YUV2RGB_B, 0xe2);
-
-	OUT_REG(GLAMO_REG_ISP_PORT1_DEC_EN, GLAMO_ISP_PORT1_EN_OUTPUT);
-	OUT_REG(GLAMO_REG_ISP_PORT2_EN, GLAMO_ISP_PORT2_EN_DECODE);
-
-	END_CMDQ();
-
-	GLAMOSetOnFlyRegs(pScreen);
-	GLAMOSetWeightRegs(pScreen);
-}
-
-Bool
-GLAMOVideoSetup(ScreenPtr pScreen)
-{
-	GLAMOEngineEnable(pScreen, GLAMO_ENGINE_ISP);
-	GLAMOEngineReset(pScreen, GLAMO_ENGINE_ISP);
-
-	GLAMOInitISP(pScreen);
-
-	return TRUE;
+	GLAMO_LOG ("leave\n");
 }
 
 void
@@ -973,3 +929,4 @@ GLAMOVideoTeardown(ScreenPtr pScreen)
 	GLAMOEngineDisable(pScreen, GLAMO_ENGINE_ISP);
 }
 
+#endif /*XV*/

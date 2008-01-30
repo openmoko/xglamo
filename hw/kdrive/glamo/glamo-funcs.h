@@ -25,6 +25,10 @@
 #ifndef _GLAMO_FUNCS_H_
 #define _GLAMO_FUNCS_H_
 
+#ifdef HAVE_CONFIG_H
+#include <kdrive-config.h>
+#endif
+
 #include <assert.h>
 #include "os.h"
 #include "kdrive.h"
@@ -37,8 +41,47 @@ void glamoSetBitMask(ScreenPtr pScreen, int reg, int mask, int val);
 
 void setCmdMode (ScreenPtr pScreen, Bool on);
 
-Bool
-glamoRotateLCD (ScreenPtr pScreen, Rotation rotation);
+Bool glamoRotateLCD (ScreenPtr pScreen, Rotation rotation);
+
+#ifdef XV
+
+void GLAMOISPWaitEngineIdle (ScreenPtr pScreen);
+void GLAMOISPEngineInit (ScreenPtr pScreen);
+void GLAMOISPDisplayYUVPlanarFrame (ScreenPtr pScreen,
+				    unsigned int y_addr,
+				    unsigned int u_addr,
+				    unsigned int v_addr,
+				    short y_pitch,
+				    short uv_pitch,
+				    short src_crop_rect_width,
+				    short src_crop_rect_height,
+				    unsigned int dst_addr,
+				    short dst_pitch,
+				    short dst_rect_width,
+				    short dst_rect_height,
+				    short scale_w,
+				    short scale_h);
+
+void GLAMOISPSetColorKeyOverlay(ScreenPtr	pScreen,
+				CARD32	start_addr/*addr on 23bits*/,
+				CARD16	x /*12bits*/,
+				CARD16	y /*12bits*/,
+				CARD16	width /*12bits*/,
+				CARD16	height /*12bits*/,
+				CARD16	pitch /*12bits*/,
+				CARD8	red_key /*5bits*/,
+				CARD8	green_key /*6bits*/,
+				CARD8	blue_key /*5bits*/);
+
+void GLAMOISPSetColorKeyOverlay2(ScreenPtr	pScreen,
+				 CARD32	start_addr/*addr on 23bits*/,
+				 CARD16	x /*12bits*/,
+				 CARD16	y /*12bits*/,
+				 CARD16	width /*12bits*/,
+				 CARD16	height /*12bits*/,
+				 CARD16	pitch /*12bits*/,
+				 CARD16	color_key /*16bits*/);
+#endif /*XV*/
 
 #endif /*_GLAMO_FUNCS_H_*/
 

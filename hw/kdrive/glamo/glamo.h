@@ -118,23 +118,10 @@ typedef struct _GLAMOCursor {
 
 #define GLAMO_VIDEO_NUM_BUFS 2
 typedef struct _GLAMOPortPriv {
-	int brightness;
-	int saturation;
+	CARD16 color_key;
 	RegionRec clip;
-	DrawablePtr pDraw;
-	PixmapPtr pPixmap;
-
-	int idx;
-	KdOffscreenArea *off_screen[GLAMO_VIDEO_NUM_BUFS];
-	CARD32 size[GLAMO_VIDEO_NUM_BUFS];
-	CARD32 src_offsets[GLAMO_VIDEO_NUM_BUFS][3];
-	CARD32 src_pitch1;
-	CARD32 src_pitch2;
-
-	int id;
-	int src_x1, src_y1, src_x2, src_y2;
-	int dst_x1, dst_y1, dst_x2, dst_y2;
-	int src_w, src_h, dst_w, dst_h;
+	KdOffscreenArea *off_screen_yuv_buf;
+	PixmapPtr overlay_pixmap;
 } GLAMOPortPrivRec, *GLAMOPortPrivPtr;
 
 typedef struct _MemBuf {

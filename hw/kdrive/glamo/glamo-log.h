@@ -57,7 +57,24 @@ LogMessageVerb(X_NOTICE, ERROR_LOG_LEVEL, "Error:in %s:%d:%s: ",\
 LogMessageVerb(X_NOTICE, ERROR_LOG_LEVEL, __VA_ARGS__)
 #endif /*GLAMO_LOG_ERROR*/
 
+
 #endif /*NDEBUG*/
+
+#ifndef GLAMO_RETURN_IF_FAIL
+#define GLAMO_RETURN_IF_FAIL(cond) \
+if (!(cond)) {\
+	GLAMO_LOG_ERROR("contion failed:%s\n",#cond);\
+	return; \
+}
+#endif /*GLAMO_RETURN_IF_FAIL*/
+
+#ifndef GLAMO_RETURN_VAL_IF_FAIL
+#define GLAMO_RETURN_VAL_IF_FAIL(cond, val) \
+if (!(cond)) {\
+	GLAMO_LOG_ERROR("contion failed:%s\n",#cond);\
+	return val; \
+}
+#endif /*GLAMO_RETURN_VAL_IF_FAIL*/
 
 #endif /*_GLAMO_LOG_H_*/
 
