@@ -132,27 +132,29 @@ GLAMOCMDQCacheSetup(ScreenPtr pScreen);
 void
 GLAMOCMQCacheTeardown(ScreenPtr pScreen);
 
-enum glamo_engine {
+enum GLAMOEngine {
 	GLAMO_ENGINE_CMDQ,
 	GLAMO_ENGINE_ISP,
 	GLAMO_ENGINE_2D,
-	GLAMO_ENGINE_ALL /* for GLAMOEngineWait */
+	GLAMO_ENGINE_MPEG,
+	GLAMO_ENGINE_ALL,
+	NB_GLAMO_ENGINES /*should be the last entry*/
 };
 
 void
-GLAMOEngineEnable(ScreenPtr pScreen, enum glamo_engine engine);
+GLAMOEngineEnable(ScreenPtr pScreen, enum GLAMOEngine engine);
 
 void
-GLAMOEngineDisable(ScreenPtr pScreen, enum glamo_engine engine);
+GLAMOEngineDisable(ScreenPtr pScreen, enum GLAMOEngine engine);
 
 void
-GLAMOEngineReset(ScreenPtr pScreen, enum glamo_engine engine);
+GLAMOEngineReset(ScreenPtr pScreen, enum GLAMOEngine engine);
 
 int
-GLAMOEngineBusy(ScreenPtr pScreen, enum glamo_engine engine);
+GLAMOEngineBusy(ScreenPtr pScreen, enum GLAMOEngine engine);
 
 void
-GLAMOEngineWait(ScreenPtr pScreen, enum glamo_engine engine);
+GLAMOEngineWait(ScreenPtr pScreen, enum GLAMOEngine engine);
 
 #endif /* _GLAMO_DMA_H_ */
 

@@ -53,7 +53,7 @@ GLAMODebugFifo(GLAMOScreenInfo *glamos)
 #endif
 
 void
-GLAMOEngineReset(ScreenPtr pScreen, enum glamo_engine engine)
+GLAMOEngineReset(ScreenPtr pScreen, enum GLAMOEngine engine)
 {
 	KdScreenPriv(pScreen);
 	GLAMOCardInfo(pScreenPriv);
@@ -89,7 +89,7 @@ GLAMOEngineReset(ScreenPtr pScreen, enum glamo_engine engine)
 }
 
 void
-GLAMOEngineDisable(ScreenPtr pScreen, enum glamo_engine engine)
+GLAMOEngineDisable(ScreenPtr pScreen, enum GLAMOEngine engine)
 {
 	KdScreenPriv(pScreen);
 	GLAMOCardInfo(pScreenPriv);
@@ -145,7 +145,7 @@ GLAMOEngineDisable(ScreenPtr pScreen, enum glamo_engine engine)
 }
 
 void
-GLAMOEngineEnable(ScreenPtr pScreen, enum glamo_engine engine)
+GLAMOEngineEnable(ScreenPtr pScreen, enum GLAMOEngine engine)
 {
 	KdScreenPriv(pScreen);
 	GLAMOCardInfo(pScreenPriv);
@@ -201,7 +201,7 @@ GLAMOEngineEnable(ScreenPtr pScreen, enum glamo_engine engine)
 }
 
 int
-GLAMOEngineBusy(ScreenPtr pScreen, enum glamo_engine engine)
+GLAMOEngineBusy(ScreenPtr pScreen, enum GLAMOEngine engine)
 {
 	KdScreenPriv(pScreen);
 	GLAMOCardInfo(pScreenPriv);
@@ -242,7 +242,7 @@ GLAMOEngineBusy(ScreenPtr pScreen, enum glamo_engine engine)
 }
 
 void
-GLAMOEngineWait(ScreenPtr pScreen, enum glamo_engine engine)
+GLAMOEngineWait(ScreenPtr pScreen, enum GLAMOEngine engine)
 {
 	KdScreenPriv(pScreen);
 	GLAMOCardInfo(pScreenPriv);
@@ -284,7 +284,8 @@ GLAMOEngineWait(ScreenPtr pScreen, enum glamo_engine engine)
 			break;
 	}
 	if (TIMEDOUT()) {
-		ErrorF("Timeout idling accelerator (0x%x), resetting...\n",
+		GLAMO_LOG_ERROR("Timeout idling accelerator "
+				"(0x%x), resetting...\n",
 				status);
 		GLAMOEngineReset(glamos->screen->pScreen, GLAMO_ENGINE_CMDQ);
 		GLAMODrawSetup(glamos->screen->pScreen);
@@ -378,6 +379,9 @@ GLAMOCMDQInit(ScreenPtr pScreen)
 	char *mmio = glamoc->reg_base;
 	int cq_len = 63;
 
+	if (glamos->cmd_queue)
+		return TRUE;
+
 	glamos->ring_len = (cq_len + 1) * 1024;
 
 	glamos->cmd_queue = KdOffscreenAlloc(pScreen, glamos->ring_len + 4,
@@ -422,6 +426,9 @@ GLAMOCMDQCacheSetup(ScreenPtr pScreen)
 	GLAMOScreenInfo(pScreenPriv);
 
 	GLAMOCMDQInit(pScreen);
+
+	if (glamos->cmd_queue_cache)
+		return;
 
 	glamos->cmd_queue_cache = GLAMOCreateCMDQCache(glamos);
 	if (glamos->cmd_queue_cache == FALSE)
