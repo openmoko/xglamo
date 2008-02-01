@@ -21,14 +21,14 @@ noinst_LIBRARIES = libglamo.a
 
 libglamo_a_SOURCES = 	\
 	glamo-log.h	\
-	glamo_dma.c	\
-	glamo_dma.h	\
-	glamo_draw.c	\
-	glamo_draw.h	\
+	glamo-cmdq.c	\
+	glamo-cmdq.h	\
+	glamo-draw.c	\
+	glamo-draw.h	\
 	glamo.c		\
 	glamo.h		\
 	glamo-regs.h	\
-	glamo_video.c \
+	glamo-video.c \
 	glamo-funcs.c \
 	glamo-funcs.h
 
