@@ -29,8 +29,8 @@
 #include "glamo-log.h"
 #include "glamo.h"
 #include "glamo-regs.h"
-#include "glamo_dma.h"
-#include "glamo_draw.h"
+#include "glamo-cmdq.h"
+#include "glamo-draw.h"
 #include "kaa.h"
 
 static const CARD8 GLAMOSolidRop[16] = {

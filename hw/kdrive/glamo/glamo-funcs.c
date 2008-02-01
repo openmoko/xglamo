@@ -27,7 +27,7 @@
 #include "glamo.h"
 #include "glamo-funcs.h"
 #include "glamo-regs.h"
-#include "glamo_dma.h"
+#include "glamo-cmdq.h"
 
 #define GLAMO_OUT_REG(glamo_mmio, reg, val) \
 	(*((volatile unsigned short *) ((glamo_mmio) + (reg))) = (val))
