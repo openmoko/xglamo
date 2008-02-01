@@ -33,7 +33,7 @@ libglamo_a_SOURCES = 	\
 	glamo-funcs.h
 
 Xglamo_SOURCES = \
-	glamo_stub.c
+	glamo-stub.c
 
 GLAMO_LIBS =				\
 	libglamo.a 			\
