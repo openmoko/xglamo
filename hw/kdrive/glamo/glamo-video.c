@@ -32,8 +32,8 @@
 #define LOG_XVIDEO 0
 
 #include "glamo.h"
-#include "glamo_dma.h"
-#include "glamo_draw.h"
+#include "glamo-cmdq.h"
+#include "glamo-draw.h"
 #include "glamo-regs.h"
 #include "glamo-log.h"
 #include "kaa.h"
