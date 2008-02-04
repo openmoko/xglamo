@@ -106,6 +106,7 @@ typedef struct _GLAMOCardInfo {
 #define getGLAMOCardInfo(kd)	((GLAMOCardInfo *) ((kd)->card->driver))
 #define GLAMOCardInfo(kd)		GLAMOCardInfo *glamoc = getGLAMOCardInfo(kd)
 
+
 typedef struct _GLAMOCursor {
 	int		width, height;
 	int		xhot, yhot;
@@ -116,12 +117,59 @@ typedef struct _GLAMOCursor {
 	KdOffscreenArea *area;
 } GLAMOCursor;
 
-#define GLAMO_VIDEO_NUM_BUFS 2
+typedef struct _GLAMOVideoFrameDisplayInfo {
+	/*
+	 * the offset of where the yuv video
+	 * frame has been saved in offscreen
+	 * video ram. The value 0 would mean
+	 * the the video frame has been saved
+	 * at the beginning of video ram.
+	 */
+	unsigned int offscreen_frame_addr;
+	/*
+	 * the fourcc code of the yuv frame
+	 */
+	int id;
+	/*
+	 * width/height of the source rectangle
+	 * to crop in the yuv buffer.
+	 * The cropped rectangle is the rectangle inside
+	 * the yuv frame that is to be displayed in the destination
+	 * X drawable.
+	 */
+	short int src_w;
+	short int src_h;
+
+	/*
+	 * Destination drawable where to display the video frame
+	 * that is at offscreen_frame_addr.
+	 */
+	DrawablePtr dest_drawable;
+
+	/*
+	 * The size of the box where to display the video frame, in
+	 * the destination drawable.
+	 */
+	short int drw_w, drw_h;
+	/*
+	 * the box in which to display the video frame
+	 * in the destination drawable. This might seem a bit redundant
+	 * with drw_w, drw_h but is actually useful for the kind of
+	 * computation that is needed by the XVideo apis.
+	 */
+	BoxRec dest_box;
+	/*
+	 * clipping region to display the video frame in, inside 
+	 * the drawable.
+	 */
+	RegionRec clipped_dest_region;
+} GLAMOVideoFrameDisplayInfo;
+
 typedef struct _GLAMOPortPriv {
 	CARD16 color_key;
 	RegionRec clip;
 	KdOffscreenArea *off_screen_yuv_buf;
-	PixmapPtr overlay_pixmap;
+	GLAMOVideoFrameDisplayInfo frame_display_info;
 } GLAMOPortPrivRec, *GLAMOPortPrivPtr;
 
 typedef struct _MemBuf {
