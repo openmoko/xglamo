@@ -27,9 +27,8 @@
 #include <kdrive-config.h>
 #endif
 
-#ifdef XV
 
-#define LOG_XVIDEO 1
+#ifdef XV
 
 #include "glamo.h"
 #include "glamo-cmdq.h"
@@ -46,8 +45,6 @@
 #define SYS_PITCH_ALIGN(w) (((w) + 3) & ~3)
 #define VID_PITCH_ALIGN(w) (((w) + 1) & ~1)
 
-static Atom xvColorKey;
-
 #define IMAGE_MAX_WIDTH		640
 #define IMAGE_MAX_HEIGHT	640
 
@@ -57,9 +54,9 @@ GLAMOStopVideo(KdScreenInfo *screen, pointer data, Bool exit)
 	ScreenPtr pScreen = screen->pScreen;
 	GLAMOPortPrivPtr pPortPriv = (GLAMOPortPrivPtr)data;
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("enter\n");
-#endif
+
 
 	/*
 	for (i = 0; i < GLAMO_VIDEO_NUM_BUFS; i++)
@@ -69,9 +66,9 @@ GLAMOStopVideo(KdScreenInfo *screen, pointer data, Bool exit)
 		}
 	*/
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("leave\n");
-#endif
+
 }
 
 static int
@@ -112,15 +109,6 @@ GLAMOVideoSave(ScreenPtr pScreen, KdOffscreenArea *area)
 	int i;
 
 	GLAMO_LOG("mark\n");
-	/*
-	for (i = 0; i < GLAMO_VIDEO_NUM_BUFS; i++)
-		if (pPortPriv->off_screen[i] == area)
-		{
-			pPortPriv->off_screen[i] = 0;
-
-			break;
-		}
-		*/
 }
 
 static Bool
@@ -157,16 +145,16 @@ GetYUVFrameAddresses (unsigned int frame_addr,
 	Bool is_ok = FALSE;
 
 	if (!u_addr || !v_addr) {
-		GLAMO_LOG("failed sanity check\n");
+		GLAMO_LOG_ERROR("failed sanity check\n");
 		goto out;
 	}
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("enter: frame(%dx%d), frame_addr:%#x\n"
 		  "position:(%d,%d)\n",
 		  frame_width, frame_height,
 		  frame_addr, x, y);
-#endif
+
 
 	switch (fourcc_code) {
 		case FOURCC_YV12:
@@ -191,15 +179,15 @@ GetYUVFrameAddresses (unsigned int frame_addr,
 			is_ok = FALSE;
 			break;
 	}
-#if LOG_XVIDEO
+
 	GLAMO_LOG("y_addr:%#x, u_addr:%#x, v_addr:%#x\n",
 		  *y_addr, *u_addr, *v_addr);
-#endif
+
 out:
-#if LOG_XVIDEO
+
 	GLAMO_LOG("leave. is_ok:%d\n",
 		  is_ok);
-#endif
+
 	return is_ok;
 }
 
@@ -232,14 +220,14 @@ CopyYUVPlanarFrameRect (const char *src_frame,
 	unsigned line;
 	Bool is_ok = FALSE;
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("enter. src_frame:%#x, code:%#x\n"
 		  "frame(%d,%d)-(%dx%d), crop(%dx%d)\n"
 		  "dest:%#x",
 		  (unsigned)src_frame, (unsigned)fourcc_code,
 		  src_x, src_y, frame_width, frame_height,
 		  rect_width, rect_height, (unsigned)destination);
-#endif
+
 
 	switch (fourcc_code) {
 		case FOURCC_YV12:
@@ -256,7 +244,7 @@ CopyYUVPlanarFrameRect (const char *src_frame,
 			y_copy_dst = destination;
 			u_copy_dst = destination + rect_width*rect_height;
 			v_copy_dst = destination + rect_width*rect_height*5/4;
-#if LOG_XVIDEO
+
 			GLAMO_LOG("y_copy_src:%#x, "
 				  "u_copy_src:%#x, "
 				  "v_copy_src:%#x\n"
@@ -269,9 +257,9 @@ CopyYUVPlanarFrameRect (const char *src_frame,
 				  (unsigned)y_copy_dst,
 				  (unsigned)u_copy_dst,
 				  (unsigned)v_copy_dst);
-#endif
+
 			for (line = 0; line < rect_height; line++) {
-#if LOG_XVIDEO
+
 				GLAMO_LOG("============\n"
 					  "line:%d\n"
 					  "============\n",
@@ -280,7 +268,7 @@ CopyYUVPlanarFrameRect (const char *src_frame,
 					  "y_copy_dst:%#x, \n",
 					  (unsigned)y_copy_src,
 					  (unsigned)y_copy_dst);
-#endif
+
 
 				memcpy(y_copy_dst,
 				       y_copy_src,
@@ -293,21 +281,21 @@ CopyYUVPlanarFrameRect (const char *src_frame,
 				 * sampling.
 				 */
 				if (!(line&1)) {
-#if LOG_XVIDEO
+
 					GLAMO_LOG("u_copy_src:%#x, "
 						  "u_copy_dst:%#x\n",
 						  (unsigned)u_copy_src,
 						  (unsigned)u_copy_dst);
-#endif
+
 					memcpy(u_copy_dst,
 					       u_copy_src,
 					       rect_width/2);
-#if LOG_XVIDEO
+
 					GLAMO_LOG("v_copy_src:%#x, "
 						  "v_copy_dst:%#x\n",
 						  (unsigned)v_copy_src,
 						  (unsigned)v_copy_dst);
-#endif
+
 					memcpy(v_copy_dst,
 					       v_copy_src,
 					       rect_width/2);
@@ -327,9 +315,9 @@ CopyYUVPlanarFrameRect (const char *src_frame,
 	}
 	is_ok = TRUE;
 out:
-#if LOG_XVIDEO
+
 	GLAMO_LOG("leave.is_ok:%d\n", is_ok);
-#endif
+
 	return is_ok;
 }
 
@@ -350,14 +338,14 @@ GLAMOVideoUploadFrameToOffscreen (KdScreenInfo *screen,
 	ScreenPtr pScreen = screen->pScreen;
 	char *offscreen_frame = NULL;
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("enter. frame(%dx%d), crop(%dx%d)\n",
 		  yuv_frame_width, yuv_frame_height,
 		  src_w, src_h);
-#endif
+
 
 	if (!GetYUVFrameByteSize (fourcc_code, src_w, src_h, &size)) {
-		GLAMO_LOG("failed to get frame size\n");
+		GLAMO_LOG_ERROR("failed to get frame size\n");
 		goto out;
 	}
 
@@ -371,10 +359,13 @@ GLAMOVideoUploadFrameToOffscreen (KdScreenInfo *screen,
 			KdOffscreenAlloc(pScreen, size, VID_PITCH_ALIGN(2),
 					 TRUE, GLAMOVideoSave, portPriv);
 		if (!portPriv->off_screen_yuv_buf) {
-			GLAMO_LOG("failed to allocate offscreen memory\n");
+			GLAMO_LOG_ERROR("failed to allocate "
+					"offscreen memory\n");
 			goto out;
 		}
+
 		GLAMO_LOG("allocated %d bytes of offscreen memory\n", size);
+
 	}
 	offscreen_frame = screen->memory_base +
 				portPriv->off_screen_yuv_buf->offset;
@@ -386,16 +377,17 @@ GLAMOVideoUploadFrameToOffscreen (KdScreenInfo *screen,
 				     yuv_frame_width, yuv_frame_height,
 				     src_x, src_y, src_w, src_h,
 				     offscreen_frame)) {
-		GLAMO_LOG("failed to copy yuv frame to offscreen memory\n");
+		GLAMO_LOG_ERROR("failed to copy yuv "
+				"frame to offscreen memory\n");
 		goto out;
 	}
 
 	is_ok = TRUE;
 out:
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("leave:%d\n", is_ok);
-#endif
+
 	return is_ok;
 
 }
@@ -422,26 +414,28 @@ GLAMODisplayYUVPlanarFrameRegion (ScreenPtr pScreen,
 
 	GLAMO_RETURN_IF_FAIL(clipping_region && dst_box);
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("enter: frame addr:%#x, fourcc:%#x, \n"
 		  "frame:(%dx%d), dst_addr:%#x, dst_pitch:%hd\n"
 		  "scale:(%hd,%hd), dst_box(%d,%d)\n",
 		  yuv_frame_addr, fourcc_code, frame_width, frame_height,
 		  dst_addr, dst_pitch, scale_w, scale_h,
 		  dst_box->x1, dst_box->y1);
-#endif
+
 
 	GLAMO_RETURN_IF_FAIL(clipping_region);
 	rect = REGION_RECTS(clipping_region);
 	num_rects = REGION_NUM_RECTS(clipping_region);
-#if LOG_XVIDEO
+
 	GLAMO_LOG("num_rects to display:%d\n", num_rects);
-#endif
+
 	for (i = 0; i < num_rects; i++, rect++) {
+
 		GLAMO_LOG("rect num:%d, (%d,%d,%d,%d)\n",
 			  i,
 			  rect->x1, rect->y1,
 			  rect->x2, rect->y2);
+
 		dst_width = abs(rect->x2 - rect->x1);
 		dst_height = abs(rect->y2 - rect->y1);
 		dest_addr = dst_addr + rect->x1*2 + rect->y1*dst_pitch;
@@ -449,9 +443,9 @@ GLAMODisplayYUVPlanarFrameRegion (ScreenPtr pScreen,
 		src_h = (dst_height * scale_h) >> 11;
 		src_x = ((abs(rect->x1 - dst_box->x1) * scale_w) >> 11);
 		src_y = ((abs(rect->y1 - dst_box->y1) * scale_h) >> 11);
-#if LOG_XVIDEO
+
 		GLAMO_LOG("matching src rect:(%d,%d)-(%dx%d)\n",
-#endif
+
 			  src_x,src_y, src_w, src_h);
 
 		if (!GetYUVFrameAddresses (yuv_frame_addr,
@@ -478,9 +472,9 @@ GLAMODisplayYUVPlanarFrameRegion (ScreenPtr pScreen,
 					      dst_width, dst_height,
 					      scale_w, scale_h);
 	}
-#if LOG_XVIDEO
+
 	GLAMO_LOG("leave\n");
-#endif
+
 }
 
 static void
@@ -494,9 +488,9 @@ GLAMODisplayFrame (KdScreenInfo *screen,
 	PixmapPtr dest_pixmap;
 	ScreenPtr pScreen;
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("enter\n");
-#endif
+
 
 	GLAMO_RETURN_IF_FAIL (screen
 			      && screen->pScreen
@@ -531,9 +525,9 @@ GLAMODisplayFrame (KdScreenInfo *screen,
 					 scale_w, scale_h,
 					 &info->clipped_dest_region,
 					 &info->dest_box);
-#if LOG_XVIDEO
+
 	GLAMO_LOG("leave\n");
-#endif
+
 }
 
 static int
@@ -560,12 +554,12 @@ GLAMOPutImage(KdScreenInfo *screen, DrawablePtr dst_drawable,
 	PixmapPtr dst_pixmap;
 	RegionRec dst_reg;
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("enter. id:%#x, frame:(%dx%d) srccrop:(%d,%d)-(%dx%d)\n"
 		  "dst geo:(%d,%d)-(%dx%d)\n",
 		  id, width, height, src_x, src_y, src_w, src_h,
 		  drw_x, drw_y, drw_w, drw_h);
-#endif
+
 	/*
 	 * upload the YUV frame to offscreen vram so that GLAMO can
 	 * later have access to it and blit it from offscreen vram to
@@ -579,11 +573,11 @@ GLAMOPutImage(KdScreenInfo *screen, DrawablePtr dst_drawable,
 		GLAMO_LOG("failed to upload frame to offscreen\n");
 		return BadAlloc;
 	}
-#if LOG_XVIDEO
+
 	GLAMO_LOG("copied video frame to vram offset:%#x\n",
 		  offscreen_frame_addr);
 	GLAMO_LOG("y_pitch:%hd, crop(%hdx%hd)\n", src_w, src_w, src_h);
-#endif
+
 
 	/*
 	 * Save the information necessary to display the video frame
@@ -619,9 +613,9 @@ GLAMOPutImage(KdScreenInfo *screen, DrawablePtr dst_drawable,
 	 */
 	GLAMODisplayFrame(screen, portPriv);
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("leave\n");
-#endif
+
 	return Success;
 }
 
@@ -636,9 +630,9 @@ GLAMOReputImage(KdScreenInfo *screen,
 	GLAMOPortPrivPtr	portPriv = (GLAMOPortPrivPtr)data;
 	RegionRec dst_reg;
 
-#if LOG_XVIDEO
+
 	GLAMO_LOG("enter\n");
-#endif
+
 
 	GLAMO_RETURN_VAL_IF_FAIL(portPriv
 				 && screen
@@ -660,9 +654,9 @@ GLAMOReputImage(KdScreenInfo *screen,
 				                 &info->clipped_dest_region),
 				 BadImplementation);
 	GLAMODisplayFrame(screen, portPriv);
-#if LOG_XVIDEO
+
 	GLAMO_LOG("leave\n");
-#endif
+
 	return Success;
 }
 
