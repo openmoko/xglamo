@@ -35,8 +35,6 @@
 #define GLAMO_IN_REG(glamo_mmio, reg) \
 	(*((volatile unsigned short *) ((glamo_mmio) + (reg))))
 
-#define LOG_VERBOSE 0
-
 void
 GLAMOOutReg(ScreenPtr pScreen, unsigned short reg, unsigned short val)
 {
@@ -533,7 +531,7 @@ GLAMOISPDisplayYUVPlanarFrame (ScreenPtr pScreen,
 	int en3;
 	RING_LOCALS;
 
-#if LOG_VERBOSE
+
 	GLAMO_LOG("enter: y_addr:%#x, u_addr:%#x, v_addr:%#x\n"
 		  "y_pitch:%hd, uv_pitch:%hd\n"
 		  "src_crop_rect(%hdx%hd)\n"
@@ -545,7 +543,7 @@ GLAMOISPDisplayYUVPlanarFrame (ScreenPtr pScreen,
 		  dst_addr, dst_pitch,
 		  dst_rect_width, dst_rect_height,
 		  scale_w, scale_h);
-#endif
+
 
 	/*scale_w <<= 11;*/
 	/*scale_h <<= 11;*/
@@ -594,9 +592,9 @@ GLAMOISPDisplayYUVPlanarFrame (ScreenPtr pScreen,
 
         GLAMOEngineWait(pScreen, GLAMO_ENGINE_ALL);
 
-#if LOG_VERBOSE
+
 	GLAMO_LOG("leave\n");
-#endif
+
 }
 
 #endif /*XV*/
