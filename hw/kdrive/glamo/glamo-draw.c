@@ -130,6 +130,7 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 	OUT_REG(GLAMO_REG_2D_PAT_FG, fg);
 	OUT_REG(GLAMO_REG_2D_COMMAND2, settings);
 	END_CMDQ();
+	kaaMarkSync(pPix->drawable.pScreen);
 
 	GLAMO_LOG("leave\n");
 
@@ -152,12 +153,17 @@ GLAMOSolid(int x1, int y1, int x2, int y2)
 	OUT_REG(GLAMO_REG_2D_ID1, 0);
 	OUT_REG(GLAMO_REG_2D_ID2, 0);
 	END_CMDQ();
+	kaaMarkSync(glamos->screen->pScreen);
 	GLAMO_LOG("leave\n");
 }
 
 static void
 GLAMODoneSolid(void)
 {
+	GLAMOScreenInfo *glamos = accel_glamos;
+	kaaWaitSync(glamos->screen->pScreen);
+	if (glamos->cmd_queue_cache)
+		GLAMOFlushCMDQCache(glamos, 1);
 }
 
 static Bool
@@ -194,6 +200,7 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 
 	settings = GLAMOBltRop[alu] << 8;
 
+
 	BEGIN_CMDQ(16);
 
 	OUT_REG(GLAMO_REG_2D_SRC_ADDRL, src_offset & 0xffff);
@@ -208,6 +215,8 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 	OUT_REG(GLAMO_REG_2D_COMMAND2, settings);
 
 	END_CMDQ();
+
+	kaaMarkSync(pDst->drawable.pScreen);
 
 	GLAMO_LOG("leave\n");
 
@@ -231,12 +240,18 @@ GLAMOCopy(int srcX, int srcY, int dstX, int dstY, int w, int h)
 	OUT_REG(GLAMO_REG_2D_ID1, 0);
 	OUT_REG(GLAMO_REG_2D_ID2, 0);
 	END_CMDQ();
+
+	kaaMarkSync(glamos->screen->pScreen);
 }
 
 static void
 GLAMODoneCopy(void)
 {
+	GLAMOScreenInfo *glamos = accel_glamos;
 	GLAMO_LOG("enter\n");
+	kaaWaitSync(glamos->screen->pScreen);
+	if (glamos->cmd_queue_cache)
+		GLAMOFlushCMDQCache(glamos, 1);
 	GLAMO_LOG("leave\n");
 }
 
@@ -279,6 +294,7 @@ GLAMOBlockHandler(pointer blockData, OSTimePtr timeout, pointer readmask)
 	 * make sure that the cmd queue cache
 	 * has been flushed.
 	 */
+	kaaWaitSync(pScreen);
 	if (glamos->cmd_queue_cache)
 		GLAMOFlushCMDQCache(glamos, 1);
 }
@@ -326,8 +342,8 @@ GLAMODrawInit(ScreenPtr pScreen)
 	if (offscreen_memory_size > 0) {
 		glamos->kaa.flags = KAA_OFFSCREEN_PIXMAPS;
 	}
-	glamos->kaa.offsetAlign = 1;
-	glamos->kaa.pitchAlign = 1;
+	glamos->kaa.offsetAlign = 16;
+	glamos->kaa.pitchAlign = 16;
 
 	kaaInitTrapOffsets(8, sample_offsets_x, sample_offsets_y, 0.0, 0.0);
 	sample_count = (1 << 8) - 1;
