@@ -186,6 +186,15 @@ typedef struct _GLAMOScreenInfo {
 		FbdevScrPriv fbdev;
 	} backend_priv;
 	KaaScreenInfoRec kaa;
+	ExaDriverRec exa;
+	Bool use_exa;
+	PixmapPtr srcPixmap;
+	PixmapPtr dstPixmap;
+	CARD32 src_offset;
+	CARD32 dst_offset;
+	CARD32 src_pitch;
+	CARD32 dst_pitch;
+	CARD32 settings;
 
 	GLAMOCardInfo *glamoc;
 	KdScreenInfo *screen;
@@ -200,6 +209,7 @@ typedef struct _GLAMOScreenInfo {
 	int		num_texture_ports;
 
 	KdOffscreenArea *cmd_queue;	/* mmapped on-device cmd queue. */
+	ExaOffscreenArea *exa_cmd_queue;
 	CARD16		*ring_addr;	/* Beginning of ring buffer. */
 	int		ring_write;	/* Index of write ptr in ring. */
 	int		ring_read;	/* Index of read ptr in ring. */
@@ -250,6 +260,11 @@ GLAMOMapReg(KdCardInfo *card, GLAMOCardInfo *glamoc);
 
 void
 GLAMOUnmapReg(KdCardInfo *card, GLAMOCardInfo *glamoc);
+
+void
+GLAMODumpRegs(GLAMOScreenInfo *glamos,
+	      CARD16 from,
+	      CARD16 to);
 
 /* glamo_draw.c */
 void
