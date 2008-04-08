@@ -9,6 +9,7 @@ VESA_LIBS = $(top_builddir)/hw/kdrive/vesa/libvesa.a
 endif
 
 INCLUDES = 					\
+	-I$(top_srcdir)/exa			\
 	@KDRIVE_INCS@				\
 	$(DRI_INCLUDES)				\
 	$(FBDEV_INCLUDES)			\
@@ -37,6 +38,7 @@ Xglamo_SOURCES = \
 
 GLAMO_LIBS =				\
 	libglamo.a 			\
+	$(top_builddir)/exa/libexa.la   \
 	$(FBDEV_LIBS)			\
 	$(VESA_LIBS)			\
 	$(DRI_LIBS)			\
@@ -44,6 +46,7 @@ GLAMO_LIBS =				\
 
 Xglamo_LDADD = \
 	$(GLAMO_LIBS)			\
+	@KDRIVE_LIBS@			\
 	@KDRIVE_LIBS@			\
 	@XSERVER_LIBS@
 

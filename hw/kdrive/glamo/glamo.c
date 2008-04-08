@@ -186,14 +186,14 @@ static KdMonitorTiming  glamoMonitorTimings[] = {
 	 /*pixel clock(KHz)*/12250,
 	 /*horiz back porsh(pixels)*/16, /*horiz front porsh(pixels)*/48,
 	 /*hblank(pixels)*/160, /*horiz polarity*/KdSyncNegative,
-	 /*vert back porsh(pixels)*/10, /*vert front porsh(pixels)*/33,
+	 /*horiz back porsh(pixels)*/10, /*horiz front porsh(pixels)*/33,
 	 /*vblank(pixels)*/45, /*horiz polarity*/KdSyncNegative,
         },
 	{/*horiz size*/240,  /*vert size*/320, /*frame rate(Hz)*/60,
 	 /*pixel clock(KHz)*/24500,
 	 /*horiz back porsh(pixels)*/16, /*horiz front porsh(pixels)*/48,
 	 /*hblank(pixels)*/160, /*horiz polarity*/KdSyncNegative,
-	 /*vert back porsh(pixels)*/10, /*vert front porsh(pixels)*/33,
+	 /*horiz back porsh(pixels)*/10, /*horiz front porsh(pixels)*/33,
 	 /*vblank(pixels)*/45, /*horiz polarity*/KdSyncNegative,
         },
 };
@@ -602,6 +602,20 @@ GLAMOUnmapReg(KdCardInfo *card, GLAMOCardInfo *glamoc)
 		    KD_MAPPED_MODE_REGISTERS);
 		KdUnmapDevice((void *)glamoc->reg_base, GLAMO_REG_SIZE(card));
 		glamoc->reg_base = 0;
+	}
+}
+
+void
+GLAMODumpRegs(GLAMOScreenInfo *glamos,
+	      CARD16 from,
+	      CARD16 to)
+{
+	GLAMOCardInfo *glamoc = glamos->glamoc;
+	int i=0;
+	for (i=from; i <= to; i += 2) {
+		GLAMO_LOG("reg:%#x, val:%#x\n",
+			  glamoc->reg_base+i,
+			  *(VOL16*)(glamoc->reg_base+i));
 	}
 }
 
