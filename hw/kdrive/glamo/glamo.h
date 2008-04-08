@@ -35,6 +35,7 @@
 
 #include <fbdev.h>
 #include "kxv.h"
+#include "exa.h"
 
 #define GLAMO_REG_BASE(c)		((c)->attr.address[0])
 #define GLAMO_REG_SIZE(c)		(0x2400)
