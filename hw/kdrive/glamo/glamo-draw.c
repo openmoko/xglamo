@@ -226,13 +226,17 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 
 	accel_glamos = glamos;
 
-	settings = GLAMOSolidRop[alu] << 8;
-	offset = ((CARD8 *) pPix->devPrivate.ptr -
+	glamos->settings = GLAMOSolidRop[alu] << 8;
+	glamos->src_offset = ((CARD8 *) pPix->devPrivate.ptr -
 			pScreenPriv->screen->memory_base);
-	pitch = pPix->devKind;
+	glamos->src_pitch = pPix->devKind;
+	glamos->srcPixmap = pPix;
+	glamos->foreground = fg;
 
-	GLAMO_LOG("enter.pitch:%d\n", pitch);
+	GLAMO_LOG("enter:, src_offset:%#x, src_pitch:%d, fg%#x\n",
+		  glamos->foreground,glamos->src_pitch, glamos->src_offset);
 
+	/*
 	BEGIN_CMDQ(12);
 	OUT_REG(GLAMO_REG_2D_DST_ADDRL, offset & 0xffff);
 	OUT_REG(GLAMO_REG_2D_DST_ADDRH, (offset >> 16) & 0x7f);
@@ -241,8 +245,9 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 	OUT_REG(GLAMO_REG_2D_PAT_FG, fg);
 	OUT_REG(GLAMO_REG_2D_COMMAND2, settings);
 	END_CMDQ();
-	kaaMarkSync(pPix->drawable.pScreen);
+	*/
 
+	kaaMarkSync(glamos->screen->pScreen);
 	GLAMO_LOG("leave\n");
 
 	return TRUE;
@@ -251,11 +256,18 @@ GLAMOPrepareSolid(PixmapPtr pPix, int alu, Pixel pm, Pixel fg)
 static void
 GLAMOSolid(int x1, int y1, int x2, int y2)
 {
-	GLAMO_LOG("enter\n");
+	GLAMO_LOG("enter: (x1,y1,x2,y2):(%d,%d,%d,%d)\n",
+		  x1, y1, x2, y2);
 	GLAMOScreenInfo *glamos = accel_glamos;
 	RING_LOCALS;
 
-	BEGIN_CMDQ(14);
+	BEGIN_CMDQ(26);
+	OUT_REG(GLAMO_REG_2D_DST_ADDRL, glamos->src_offset & 0xffff);
+	OUT_REG(GLAMO_REG_2D_DST_ADDRH, (glamos->src_offset >> 16) & 0x7f);
+	OUT_REG(GLAMO_REG_2D_DST_PITCH, glamos->src_pitch);
+	OUT_REG(GLAMO_REG_2D_DST_HEIGHT, glamos->srcPixmap->drawable.height);
+	OUT_REG(GLAMO_REG_2D_PAT_FG, glamos->foreground);
+	OUT_REG(GLAMO_REG_2D_COMMAND2, glamos->settings);
 	OUT_REG(GLAMO_REG_2D_DST_X, x1);
 	OUT_REG(GLAMO_REG_2D_DST_Y, y1);
 	OUT_REG(GLAMO_REG_2D_RECT_WIDTH, x2 - x1);
@@ -264,7 +276,6 @@ GLAMOSolid(int x1, int y1, int x2, int y2)
 	OUT_REG(GLAMO_REG_2D_ID1, 0);
 	OUT_REG(GLAMO_REG_2D_ID2, 0);
 	END_CMDQ();
-	kaaMarkSync(glamos->screen->pScreen);
 	GLAMO_LOG("leave\n");
 }
 
@@ -278,7 +289,8 @@ GLAMODoneSolid(void)
 }
 
 static Bool
-GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel pm)
+GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst,
+		 int dx, int dy, int alu, Pixel pm)
 {
 	KdScreenPriv(pDst->drawable.pScreen);
 	GLAMOScreenInfo(pScreenPriv);
@@ -303,37 +315,17 @@ GLAMOPrepareCopy(PixmapPtr pSrc, PixmapPtr pDst, int dx, int dy, int alu, Pixel 
 		GLAMO_FALLBACK(("Can't do planemask 0x%08x", (unsigned int) pm));
 
 	accel_glamos = glamos;
-
-	src_offset = ((CARD8 *) pSrc->devPrivate.ptr -
-			pScreenPriv->screen->memory_base);
-	src_pitch = pSrc->devKind;
-
-	dst_offset = ((CARD8 *) pDst->devPrivate.ptr -
-			pScreenPriv->screen->memory_base);
-	dst_pitch = pDst->devKind;
-	GLAMO_LOG("src_pitch:%d, dst_pitch:%d, mem_base:%#x\n",
-		  src_pitch, dst_pitch, pScreenPriv->screen->memory_base);
-
-	settings = GLAMOBltRop[alu] << 8;
-
-
-	BEGIN_CMDQ(16);
-
-	OUT_REG(GLAMO_REG_2D_SRC_ADDRL, src_offset & 0xffff);
-	OUT_REG(GLAMO_REG_2D_SRC_ADDRH, (src_offset >> 16) & 0x7f);
-	OUT_REG(GLAMO_REG_2D_SRC_PITCH, src_pitch);
-
-	OUT_REG(GLAMO_REG_2D_DST_ADDRL, dst_offset & 0xffff);
-	OUT_REG(GLAMO_REG_2D_DST_ADDRH, (dst_offset >> 16) & 0x7f);
-	OUT_REG(GLAMO_REG_2D_DST_PITCH, dst_pitch);
-	OUT_REG(GLAMO_REG_2D_DST_HEIGHT, pDst->drawable.height);
-
-	OUT_REG(GLAMO_REG_2D_COMMAND2, settings);
-
-	END_CMDQ();
+	glamos->src_offset = ((CARD8 *) pSrc->devPrivate.ptr -
+				pScreenPriv->screen->memory_base);
+	glamos->src_pitch = pSrc->devKind;
+	glamos->dst_offset = ((CARD8 *) pDst->devPrivate.ptr -
+				pScreenPriv->screen->memory_base);
+	glamos->dst_pitch = pDst->devKind;
+	glamos->settings = GLAMOBltRop[alu] << 8;
+	glamos->srcPixmap = pSrc;
+	glamos->dstPixmap = pDst;
 
 	kaaMarkSync(pDst->drawable.pScreen);
-
 	GLAMO_LOG("leave\n");
 
 	return TRUE;
@@ -345,19 +337,36 @@ GLAMOCopy(int srcX, int srcY, int dstX, int dstY, int w, int h)
 	GLAMOScreenInfo *glamos = accel_glamos;
 	RING_LOCALS;
 
-	BEGIN_CMDQ(18);
-	OUT_REG(GLAMO_REG_2D_SRC_X, srcX);
-	OUT_REG(GLAMO_REG_2D_SRC_Y, srcY);
-	OUT_REG(GLAMO_REG_2D_DST_X, dstX);
-	OUT_REG(GLAMO_REG_2D_DST_Y, dstY);
-	OUT_REG(GLAMO_REG_2D_RECT_WIDTH, w);
-	OUT_REG(GLAMO_REG_2D_RECT_HEIGHT, h);
+	GLAMO_LOG("enter: src(%d,%d), dst(%d,%d), wxh(%dx%d)\n",
+		  srcX, srcY, dstX, dstY, w, h);
+	GLAMO_LOG("src_offset:%#x, dst_offset:%#x\n",
+		  glamos->src_offset, glamos->dst_offset);
+
+	BEGIN_CMDQ(34);
+
+	OUT_REG(GLAMO_REG_2D_SRC_ADDRL, glamos->src_offset & 0xffff);
+	OUT_REG(GLAMO_REG_2D_SRC_ADDRH, (glamos->src_offset >> 16) & 0x7f);
+	OUT_REG(GLAMO_REG_2D_SRC_PITCH, glamos->src_pitch & 0x7ff);
+	OUT_REG(GLAMO_REG_2D_SRC_X, srcX & 0x7ff);
+	OUT_REG(GLAMO_REG_2D_SRC_Y, srcY & 0x7ff);
+	OUT_REG(GLAMO_REG_2D_DST_X, dstX & 0x7ff);
+	OUT_REG(GLAMO_REG_2D_DST_Y, dstY & 0x7ff);
+	OUT_REG(GLAMO_REG_2D_DST_ADDRL, glamos->dst_offset & 0xffff);
+	OUT_REG(GLAMO_REG_2D_DST_ADDRH, (glamos->dst_offset >> 16) & 0x7f);
+	OUT_REG(GLAMO_REG_2D_DST_PITCH, glamos->dst_pitch & 0x7ff);
+	OUT_REG(GLAMO_REG_2D_DST_HEIGHT,
+		glamos->dstPixmap->drawable.height & 0x3ff);
+	OUT_REG(GLAMO_REG_2D_RECT_WIDTH, w & 0x3ff);
+	OUT_REG(GLAMO_REG_2D_RECT_HEIGHT, h & 0x3ff);
+
+	OUT_REG(GLAMO_REG_2D_COMMAND2, glamos->settings && 0xffff);
+
 	OUT_REG(GLAMO_REG_2D_COMMAND3, 0);
 	OUT_REG(GLAMO_REG_2D_ID1, 0);
 	OUT_REG(GLAMO_REG_2D_ID2, 0);
 	END_CMDQ();
 
-	kaaMarkSync(glamos->screen->pScreen);
+	GLAMO_LOG("leave\n");
 }
 
 static void
@@ -366,8 +375,10 @@ GLAMODoneCopy(void)
 	GLAMOScreenInfo *glamos = accel_glamos;
 	GLAMO_LOG("enter\n");
 	kaaWaitSync(glamos->screen->pScreen);
+	kaaMarkSync(glamos->screen->pScreen);
 	if (glamos->cmd_queue_cache)
 		GLAMOFlushCMDQCache(glamos, 1);
+	kaaWaitSync(glamos->screen->pScreen);
 	GLAMO_LOG("leave\n");
 }
 
@@ -386,7 +397,8 @@ GLAMOUploadToScreen(PixmapPtr pDst, char *src, int src_pitch)
 	bpp = pDst->drawable.bitsPerPixel;
 	bpp /= 8;
 
-	GLAMO_LOG("dst_pitch:%d, src_pitch\n", dst_pitch, src_pitch);
+	GLAMO_LOG("wxh(%dx%d), bpp:%d, dst_pitch:%d, src_pitch:%d\n",
+		  width, height, bpp, dst_pitch, src_pitch);
 
 	for (i = 0; i < height; i++)
 	{
@@ -463,9 +475,6 @@ GLAMODrawKaaInit(ScreenPtr pScreen)
 	glamos->kaa.offsetAlign = 16;
 	glamos->kaa.pitchAlign = 16;
 
-	kaaInitTrapOffsets(8, sample_offsets_x, sample_offsets_y, 0.0, 0.0);
-	sample_count = (1 << 8) - 1;
-
 	if (!kaaDrawInit(pScreen, &glamos->kaa)) {
 		GLAMO_LOG_ERROR("failed to init kaa\n");
 		return FALSE;
@@ -531,8 +540,8 @@ GLAMODrawExaInit(ScreenPtr pScreen)
 	/*glamos->exa.MarkSync = GLAMOExaMarkSync;*/
 	glamos->exa.WaitMarker = GLAMOExaWaitMarker;
 
-	glamos->exa.pixmapOffsetAlign = 16;
-	glamos->exa.pixmapPitchAlign = 16;
+	glamos->exa.pixmapOffsetAlign = 1;
+	glamos->exa.pixmapPitchAlign = 1;
 
 	glamos->exa.maxX = 640;
 	glamos->exa.maxY = 640;
@@ -570,12 +579,12 @@ GLAMODrawInit(ScreenPtr pScreen)
 		  pScreenPriv->screen->fb[0].bitsPerPixel);
 
 	use_exa = getenv("USE_EXA");
-	if (use_exa && !strcmp(use_exa, "no")) {
-		glamos->use_exa = FALSE;
-		return GLAMODrawKaaInit(pScreen);
-	} else {
+	if (use_exa && !strcmp(use_exa, "yes")) {
 		glamos->use_exa = TRUE;
 		return GLAMODrawExaInit(pScreen);
+	} else {
+		glamos->use_exa = FALSE;
+		return GLAMODrawKaaInit(pScreen);
 	}
 }
 
@@ -743,8 +752,6 @@ GLAMOExaPrepareCopy(PixmapPtr       pSrc,
 	glamos->settings = GLAMOBltRop[alu] << 8;
 	exaMarkSync(pDst->drawable.pScreen);
 	GLAMO_LOG("leave\n");
-
-
 	return TRUE;
 }
 
