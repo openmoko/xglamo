@@ -359,7 +359,7 @@ GLAMOCopy(int srcX, int srcY, int dstX, int dstY, int w, int h)
 	OUT_REG(GLAMO_REG_2D_RECT_WIDTH, w & 0x3ff);
 	OUT_REG(GLAMO_REG_2D_RECT_HEIGHT, h & 0x3ff);
 
-	OUT_REG(GLAMO_REG_2D_COMMAND2, glamos->settings && 0xffff);
+	OUT_REG(GLAMO_REG_2D_COMMAND2, glamos->settings & 0xffff);
 
 	OUT_REG(GLAMO_REG_2D_COMMAND3, 0);
 	OUT_REG(GLAMO_REG_2D_ID1, 0);
