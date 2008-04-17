@@ -423,7 +423,8 @@ GLAMOCMDQResetCP(ScreenPtr pScreen)
 }
 
 static Bool
-GLAMOCMDQInit(ScreenPtr pScreen)
+GLAMOCMDQInit(ScreenPtr pScreen,
+	      Bool force)
 {
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
@@ -431,9 +432,9 @@ GLAMOCMDQInit(ScreenPtr pScreen)
 	char *mmio = glamoc->reg_base;
 	int cq_len = CQ_LEN;
 
-	if (glamos->use_exa && glamos->exa_cmd_queue)
+	if (!force && glamos->use_exa && glamos->exa_cmd_queue)
 		return TRUE;
-	if (!glamos->use_exa && glamos->cmd_queue)
+	if (!force && !glamos->use_exa && glamos->cmd_queue)
 		return TRUE;
 
 	glamos->ring_len = (cq_len + 1) * 1024;
@@ -471,7 +472,7 @@ GLAMOCMDQCacheSetup(ScreenPtr pScreen)
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
 
-	GLAMOCMDQInit(pScreen);
+	GLAMOCMDQInit(pScreen, TRUE);
 
 	if (glamos->cmd_queue_cache)
 		return;
