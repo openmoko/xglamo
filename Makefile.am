@@ -26,6 +26,10 @@ if GLX
 GLX_DIR=glx
 endif
 
+if XKB
+XKB_DIR=xkb
+endif
+
 if DBE
 DBE_DIR=dbe
 endif
@@ -46,7 +50,7 @@ SUBDIRS = \
 	randr \
 	render  \
 	Xi \
-	xkb \
+	$(XKB_DIR) \
 	$(DBE_DIR) \
 	$(MFB_DIR) \
 	$(AFB_DIR) \
