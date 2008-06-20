@@ -43,6 +43,8 @@
 #include "dpmsproc.h"
 #endif
 
+int use_evdev = 0;
+
 typedef struct _kdDepths {
     CARD8   depth;
     CARD8   bpp;
@@ -685,6 +687,7 @@ KdUseMsg (void)
     ErrorF("-videoTest       Start the server, pause momentarily and exit\n");
     ErrorF("-origin X,Y      Locates the next screen in the the virtual screen (Xinerama)\n");
     ErrorF("-mouse path[,n]  Filename of mouse device, n is number of buttons\n");
+    ErrorF("-use-evdev       Use Linux evdev input\n");
     ErrorF("-switchCmd       Command to execute on vt switch\n");
     ErrorF("-nozap           Don't terminate server on Ctrl+Alt+Backspace\n");
     ErrorF("vtxx             Use virtual terminal xx instead of the next available\n");
@@ -793,6 +796,11 @@ KdProcessArgument (int argc, char **argv, int i)
 	else
 	    UseMsg ();
 	return 2;
+    }
+    if (!strcmp (argv[i], "-use-evdev"))
+    {
+	use_evdev = 1;
+	return 1;
     }
     if (!strcmp (argv[i], "-keyboard"))
     {

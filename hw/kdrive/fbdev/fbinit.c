@@ -28,6 +28,8 @@
 #endif
 #include <fbdev.h>
 
+extern int use_evdev;
+
 void
 InitCard (char *name)
 {
@@ -45,7 +47,10 @@ InitOutput (ScreenInfo *pScreenInfo, int argc, char **argv)
 void
 InitInput (int argc, char **argv)
 {
-    KdInitInput (&LinuxMouseFuncs, &LinuxKeyboardFuncs);
+    if (use_evdev)
+        KdInitInput (&LinuxEvdevMouseFuncs, &LinuxEvdevKeyboardFuncs);
+    else
+        KdInitInput (&LinuxMouseFuncs, &LinuxKeyboardFuncs);
 #ifdef TOUCHSCREEN
     KdAddMouseDriver (&TsFuncs);
 #endif
