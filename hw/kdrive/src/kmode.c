@@ -106,6 +106,8 @@ const KdMonitorTiming  kdMonitorTimings[] = {
 		    16,	    120,    176,    KdSyncNegative, /* 37.861 */
 		    1,	    20,	    24,	    KdSyncNegative, /* 72.809 */
     },
+    /* DEFAULT */
+#define MONITOR_TIMING_DEFAULT	13
     {	640,	480,	60,	25175,			    /* VESA */
 		   16,	    48,	    160,    KdSyncNegative, /* 31.469 */
 		   10,	    33,	    45,	    KdSyncNegative, /* 59.940 */
@@ -127,8 +129,6 @@ const KdMonitorTiming  kdMonitorTimings[] = {
 		    16,	    160,    256,    KdSyncPositive, /* 46.875 */
 		    1,	    21,	    25,	    KdSyncPositive, /* 75.000 */
     },
-    /* DEFAULT */
-#define MONITOR_TIMING_DEFAULT	9
     {	800,	600,	72,	50000,			    /* VESA */
 		    56,	    64,	    240,    KdSyncPositive, /* 48.077 */
 		    37,	    23,	    66,	    KdSyncPositive, /* 72.188 */
