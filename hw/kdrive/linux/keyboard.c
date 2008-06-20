@@ -36,6 +36,9 @@
 
 extern int  LinuxConsoleFd;
 
+static int seen_high_key = 0;
+static unsigned char high_keys[3];
+
 static const KeySym linux_to_x[256] = {
 	NoSymbol,	NoSymbol,	NoSymbol,	NoSymbol,
 	NoSymbol,	NoSymbol,	NoSymbol,	NoSymbol,
@@ -391,7 +394,32 @@ LinuxKeyboardRead (int fd, void *closure)
 	b = buf;
 	while (n--)
 	{
-	    KdEnqueueKeyboardEvent (b[0] & 0x7f, b[0] & 0x80);
+            /*
+             * See drivers/char/keyboard.c in the linux tree for extended
+             * medium raw for keys above 127.
+             */ 
+            int code = b[0] & 0x7f;
+
+            if (seen_high_key > 0) {
+                high_keys[seen_high_key++] = b[0];
+
+                /*
+                 * Commit high key codes
+                 */ 
+                if (seen_high_key >= 3) {
+                    int keycode = ((b[1] & 0x7f) << 7) | (b[2] & 0x7f);
+                    KdEnqueueKeyboardEvent (keycode, high_keys[0] & 0x80);
+
+                    seen_high_key = 0;
+                    high_keys[0] = high_keys[1] = high_keys[2] = 0;
+                }
+            } else if (code != 0) {
+	        KdEnqueueKeyboardEvent (b[0] & 0x7f, b[0] & 0x80);
+            } else {
+                seen_high_key = 1;
+                high_keys[0] = b[0];
+            }
+
 	    b++;
 	}
     }
