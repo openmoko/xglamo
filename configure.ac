@@ -521,7 +521,11 @@ XEXT_LIB='$(top_builddir)/Xext/libXext.la'
 XEXTXORG_LIB='$(top_builddir)/Xext/libXextbuiltin.la'
 
 dnl Core modules for most extensions, et al.
+if test "$KDRIVE" = yes; then
+REQUIRED_MODULES="[randrproto >= 1.2] renderproto [fixesproto >= 4.0] [damageproto >= 1.1] xcmiscproto xextproto xproto xtrans xf86bigfontproto [scrnsaverproto >= 1.1] bigreqsproto resourceproto fontsproto inputproto [kbproto >= 1.0.3]"
+else
 REQUIRED_MODULES="[randrproto >= 1.2] renderproto [fixesproto >= 4.0] [damageproto >= 1.1] xcmiscproto xextproto xproto xtrans xf86miscproto xf86vidmodeproto xf86bigfontproto [scrnsaverproto >= 1.1] bigreqsproto resourceproto fontsproto inputproto xf86dgaproto [kbproto >= 1.0.3]"
+fi
 REQUIRED_LIBS="xfont xau fontenc"
 
 AM_CONDITIONAL(XV, [test "x$XV" = xyes])
@@ -1609,7 +1613,9 @@ AC_DEFINE_DIR(XKM_OUTPUT_DIR, XKBOUTPUT, [Path to XKB output dir])
 AC_SUBST(XKB_COMPILED_DIR)
 
 dnl and the rest of these are generic, so they're in config.h
+if test ! x"$KDRIVE" = xyes; then
 AC_DEFINE(XFreeXDGA, 1, [Build XDGA support])
+fi
 AC_DEFINE(XResExtension, 1, [Build XRes extension])
 
 AC_TRY_COMPILE([
@@ -1622,10 +1628,12 @@ AC_TRY_COMPILE([
 
 AC_DEFINE_DIR(PROJECTROOT, prefix, [Overall prefix])
 
+if test ! "x$KDRIVE" = xyes ; then
 dnl xorgconfig CLI configuration utility
 PKG_CHECK_MODULES([XORGCONFIG_DEP], [xkbfile x11])
 AC_SUBST(XORGCONFIG_DEP_CFLAGS)
 AC_SUBST(XORGCONFIG_DEP_LIBS)
+fi
 
 dnl xorgcfg GUI configuration utility
 AC_ARG_ENABLE(xorgcfg, AS_HELP_STRING([--enable-xorgcfg], 
