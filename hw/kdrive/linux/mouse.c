@@ -927,8 +927,10 @@ char *kdefaultMouse[] =  {
     "/dev/psaux",
     "/dev/input/mice",
     "/dev/adbmouse",
+#ifdef BREAK_MY_SERIAL_CONSOLE
     "/dev/ttyS0",
     "/dev/ttyS1",
+#endif
 };
 
 #define NUM_DEFAULT_MOUSE    (sizeof (kdefaultMouse) / sizeof (kdefaultMouse[0]))
