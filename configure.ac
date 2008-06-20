@@ -1520,6 +1520,7 @@ if test "$KDRIVE" = yes; then
             AC_MSG_ERROR([tslib must be installed to build the tslib driver. See http://tslib.berlios.de/])
         fi
         AC_DEFINE(TSLIB, 1, [Have tslib support])
+        AC_DEFINE(TOUCHSCREEN, 1, [Have touchscreen support])
     fi
 
     # damage shadow extension glx (NOTYET) fb mi
