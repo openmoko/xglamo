@@ -340,7 +340,7 @@ LinuxEnable (void)
     /*
      * Open the APM driver
      */
-    LinuxApmFd = open ("/dev/apm_bios", 2);
+    /*LinuxApmFd = open ("/dev/apm_bios", 2);
     if (LinuxApmFd < 0 && errno == ENOENT)
 	LinuxApmFd = open ("/dev/misc/apm_bios", 2); 
     if (LinuxApmFd >= 0)
@@ -350,7 +350,7 @@ LinuxEnable (void)
 	RegisterBlockAndWakeupHandlers (LinuxApmBlock, LinuxApmWakeup, 0);
 	AddEnabledDevice (LinuxApmFd);
     }
-	
+    */	
     /*
      * now get the VT
      */
