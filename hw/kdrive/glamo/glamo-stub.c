@@ -29,6 +29,9 @@
 #include "glamo.h"
 #include "klinux.h"
 
+
+extern int use_evdev;
+
 void
 InitCard(char *name)
 {
@@ -59,9 +62,12 @@ InitOutput(ScreenInfo *pScreenInfo, int argc, char **argv)
 void
 InitInput(int argc, char **argv)
 {
-	KdInitInput (&LinuxEvdevMouseFuncs, &LinuxEvdevKeyboardFuncs);
+    if (use_evdev)
+        KdInitInput (&LinuxEvdevMouseFuncs, &LinuxEvdevKeyboardFuncs);
+    else
+        KdInitInput (&LinuxMouseFuncs, &LinuxKeyboardFuncs);
 #ifdef TOUCHSCREEN
-	KdAddMouseDriver (&TsFuncs);
+    KdAddMouseDriver (&TsFuncs);
 #endif
 }
 
