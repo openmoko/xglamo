@@ -60,6 +60,9 @@ KdDepths    kdDepths[] = {
     { 32, 32 }
 };
 
+int 
+ProcXFixesHideCursor (ClientPtr client) ;
+
 #define NUM_KD_DEPTHS (sizeof (kdDepths) / sizeof (kdDepths[0]))
 
 int                 kdScreenPrivateIndex;
@@ -86,6 +89,9 @@ DDXPointRec	    kdOrigin;
 
 KdOsFuncs	*kdOsFuncs;
 extern WindowPtr *WindowTable;
+
+extern Bool CursorInitiallyHidden; /* See Xfixes cursor.c */
+extern char* RootPPM;		   /* dix/window.c */
 
 void
 KdSetRootClip (ScreenPtr pScreen, BOOL enable)
@@ -315,6 +321,7 @@ KdEnableScreen (ScreenPtr pScreen)
     KdSetRootClip (pScreen, TRUE);
     if (pScreenPriv->card->cfuncs->dpms)
 	(*pScreenPriv->card->cfuncs->dpms) (pScreen, pScreenPriv->dpmsState);
+
     return TRUE;
 }
 
@@ -690,10 +697,14 @@ KdUseMsg (void)
     ErrorF("-use-evdev       Use Linux evdev input\n");
     ErrorF("-switchCmd       Command to execute on vt switch\n");
     ErrorF("-nozap           Don't terminate server on Ctrl+Alt+Backspace\n");
+    ErrorF("-hide-cursor     Start with cursor hidden\n");
+    ErrorF("-root-ppm [path] Specify ppm file to use as root window background.\n");
     ErrorF("vtxx             Use virtual terminal xx instead of the next available\n");
 #ifdef PSEUDO8
     p8UseMsg ();
 #endif
+
+
 }
 
 int
@@ -764,6 +775,19 @@ KdProcessArgument (int argc, char **argv, int i)
     {
 	kdSoftCursor = TRUE;
 	return 1;
+    }
+    if (!strcmp (argv[i], "-hide-cursor"))
+    {
+      CursorInitiallyHidden = TRUE;
+      return 1;
+    }
+    if (!strcmp (argv[i], "-root-ppm"))
+    {
+      if ((i+1) < argc)
+	RootPPM =  argv[i+1];
+      else
+	UseMsg ();
+      return 2;
     }
     if (!strcmp (argv[i], "-videoTest"))
     {
