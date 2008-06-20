@@ -1519,7 +1519,7 @@ if test "$KDRIVE" = yes; then
     
     # tslib...
     if test "x$TSLIB" = xyes; then
-        PKG_CHECK_MODULES([TSLIB], [tslib-0.0], [HAVE_TSLIB="yes"], [HAVE_TSLIB="no"])
+        PKG_CHECK_MODULES([TSLIB], [tslib-1.0], [HAVE_TSLIB="yes"], [HAVE_TSLIB="no"])
         if test "x$HAVE_TSLIB" = xno; then
             AC_MSG_ERROR([tslib must be installed to build the tslib driver. See http://tslib.berlios.de/])
         fi
