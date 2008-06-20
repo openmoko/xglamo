@@ -434,6 +434,7 @@ AC_ARG_ENABLE(xf86bigfont,    AS_HELP_STRING([--disable-xf86bigfont], [Build XF8
 AC_ARG_ENABLE(dpms,           AS_HELP_STRING([--disable-dpms], [Build DPMS extension (default: enabled)]), [DPMSExtension=$enableval], [DPMSExtension=yes])
 AC_ARG_ENABLE(xinput,         AS_HELP_STRING([--disable-xinput], [Build XInput Extension (default: enabled)]), [XINPUT=$enableval], [XINPUT=yes])
 AC_ARG_ENABLE(xfree86-utils,     AS_HELP_STRING([--enable-xfree86-utils], [Build xfree86 DDX utilities (default: enabled)]), [XF86UTILS=$enableval], [XF86UTILS=yes])
+AC_ARG_ENABLE(xkb,            AS_HELP_STRING([--disable-xkb], [Build XKB (default: enabled)]), [XKB=$enableval], [XKB=yes])
 
 dnl DDXes.
 AC_ARG_ENABLE(xorg,    	      AS_HELP_STRING([--enable-xorg], [Build Xorg server (default: auto)]), [XORG=$enableval], [XORG=auto])
@@ -760,12 +761,15 @@ AM_CONDITIONAL(XF86UTILS, test "x$XF86UTILS" = xyes)
 
 AC_DEFINE(SHAPE, 1, [Support SHAPE extension])
 
-AC_DEFINE(XKB, 1, [Build XKB])
-AC_DEFINE(XKB_IN_SERVER, 1, [Build XKB server])
-AC_DEFINE(XKB_DFLT_DISABLED, 0, [Disable XKB per default])
-REQUIRED_MODULES="$REQUIRED_MODULES xkbfile"
-XKB_LIB='$(top_builddir)/xkb/libxkb.la'
-XKB_STUB_LIB='$(top_builddir)/xkb/libxkbstubs.la'
+AM_CONDITIONAL(XKB, [test "x$XKB" = xyes])
+if test "x$XKB" = xyes; then
+	AC_DEFINE(XKB, 1, [Build XKB])
+	AC_DEFINE(XKB_IN_SERVER, 1, [Build XKB server])
+	AC_DEFINE(XKB_DFLT_DISABLED, 0, [Disable XKB per default])
+	REQUIRED_MODULES="$REQUIRED_MODULES xkbfile"
+	XKB_LIB='$(top_builddir)/xkb/libxkb.la'
+	XKB_STUB_LIB='$(top_builddir)/xkb/libxkbstubs.la'
+fi
 
 AC_CHECK_FUNC(strcasecmp, [], AC_DEFINE([NEED_STRCASECMP], 1,
                                         [Do not have `strcasecmp'.]))
