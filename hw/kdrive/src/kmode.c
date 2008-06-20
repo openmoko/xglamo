@@ -32,6 +32,31 @@ const KdMonitorTiming  kdMonitorTimings[] = {
     /*	H	V	Hz	KHz */
 		/*  FP	    BP	    BLANK   POLARITY */
 
+	/* Treo 650 */
+
+    {   320,	320,	64,	16256,
+	            17,	    12,	    32,     KdSyncNegative,
+	            1,      11,     14,     KdSyncNegative,
+    },
+    
+    {   320,	320,	64,	    0,
+	            0,	    0,	    0,     KdSyncNegative,
+	            0,      0,      0,     KdSyncNegative,
+    },
+	
+	/* LifeDrive/T3/TX modes */
+
+    {   320,	480,	64,	16256,
+	            17,	    12,	    32,     KdSyncNegative,
+	            1,      11,     14,     KdSyncNegative,
+    },
+    
+    {   480,	320,	64,	    0,
+	            0,	    0,	    0,     KdSyncNegative,
+	            0,      0,      0,     KdSyncNegative,
+    },
+
+
     /* IPAQ modeline:
      *
      * Modeline "320x240"      5.7222 320 337 340 352   240 241 244 254"
