@@ -172,6 +172,8 @@ static Bool TileScreenSaver(int i, int kind);
 _X_EXPORT int numSaveUndersViewable = 0;
 _X_EXPORT int deltaSaveUndersViewable = 0;
 
+char* RootPPM = NULL;
+
 #ifdef DEBUG
 /******
  * PrintWindowTree
@@ -294,6 +296,115 @@ SetWindowToDefaults(WindowPtr pWin)
     pWin->forcedBG = FALSE;
 }
 
+static int
+get_int(FILE *fp)
+{
+  int c = 0;
+
+  while ((c = getc(fp)) != EOF)
+    {
+      if (isspace(c))
+	continue;
+
+      if (c == '#')
+	while ((c = getc(fp)))
+	  if (c == EOF)
+	    return 0;
+	  else if (c == '\n')
+	    break;
+
+      if (isdigit(c)) 
+	{
+	  int val = c - '0';
+	  while ((c = getc(fp)) && isdigit(c))
+	    val = (val * 10) + (c - '0');
+	  return val;
+	}
+    }
+
+  return 0;
+}
+
+static unsigned char*
+ppm_load (const char* path, int depth, int *width, int *height)
+{
+  FILE *fp;
+  int   max, w, h, i, j, bytes_per_line;
+  unsigned char *data, *res, h1, h2;
+
+  if (depth < 16 || depth > 32)
+    return NULL;
+
+  if (depth > 16)
+    depth = 32;
+
+  fp = fopen (path, "r");
+  if (fp == NULL)
+    return FALSE;
+
+  h1 = getc(fp);
+  h2 = getc(fp);
+
+  /* magic is 'P6' for raw ppm */
+  if (h1 != 'P' && h2 != '6')
+      goto fail;
+
+  w = get_int(fp);
+  h = get_int(fp);
+
+  if (w == 0 || h == 0)
+    goto fail;
+
+  max = get_int(fp);
+
+  if (max != 255)
+      goto fail;
+
+  bytes_per_line = ((w * depth + 31) >> 5) << 2;
+
+  res = data = malloc(bytes_per_line * h);
+
+  for (i=0; i<h; i++)
+    {
+      for (j=0; j<w; j++)
+	{
+	  unsigned char buf[3];
+	  fread(buf, 1, 3, fp);
+	  
+	  switch (depth)
+	    {
+	    case 24:
+	    case 32:
+	      *data     = buf[2];
+	      *(data+1) = buf[1];
+	      *(data+2) = buf[0];
+	      data += 4;
+	      break;
+	    case 16:
+	    default:
+	      *(unsigned short*)data
+		= ((buf[0] >> 3) << 11) | ((buf[1] >> 2) << 5) | (buf[2] >> 3);
+	      data += 2;
+	      break;
+	    }
+	}
+      data += (bytes_per_line - (w*(depth>>3)));
+    }
+
+  data = res;
+
+  *width  = w;
+  *height = h;
+
+  fclose(fp);
+
+  return res;
+
+ fail:
+  fclose(fp);
+  return NULL;
+}
+
 static void
 MakeRootTile(WindowPtr pWin)
 {
@@ -303,6 +414,36 @@ MakeRootTile(WindowPtr pWin)
     int len = BitmapBytePad(sizeof(long));
     unsigned char *from, *to;
     int i, j;
+
+    if (RootPPM != NULL)
+      {
+	int            w, h;
+	unsigned char *data;
+
+	if ((data = ppm_load (RootPPM, pScreen->rootDepth, &w, &h)) != NULL)
+	  {
+	    pWin->background.pixmap 
+	      = (*pScreen->CreatePixmap)(pScreen, w, h, pScreen->rootDepth, 0);
+
+	    pWin->backgroundState = BackgroundPixmap;
+	    pGC = GetScratchGC(pScreen->rootDepth, pScreen);
+	    if (!pWin->background.pixmap || !pGC)
+	      FatalError("could not create root tile");
+
+	    ValidateGC((DrawablePtr)pWin->background.pixmap, pGC);
+
+	    (*pGC->ops->PutImage)((DrawablePtr)pWin->background.pixmap, 
+				  pGC, 
+				  pScreen->rootDepth,
+				  0, 0, w, h, 0, ZPixmap, (char *)data);
+	    FreeScratchGC(pGC);
+	    
+	    free(data);
+	    return;
+	  }
+	else
+	  ErrorF("Unable to load root window image.");
+      }
 
     pWin->background.pixmap = (*pScreen->CreatePixmap)(pScreen, 4, 4,
 						    pScreen->rootDepth, 0);
@@ -336,6 +477,7 @@ MakeRootTile(WindowPtr pWin)
    FreeScratchGC(pGC);
 
 }
+
 
 /*****
  * CreateRootWindow

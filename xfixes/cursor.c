@@ -57,8 +57,11 @@ static RESTYPE		CursorClientType;
 static RESTYPE		CursorHideCountType;
 static RESTYPE		CursorWindowType;
 static DevPrivateKey	CursorScreenPrivateKey = &CursorScreenPrivateKey;
+static Bool             CursorGloballyHidden; 
 static CursorPtr	CursorCurrent;
 static CursorPtr        pInvisibleCursor = NULL;
+
+Bool CursorInitiallyHidden = FALSE;
 
 static void deleteCursorHideCountsForScreen (ScreenPtr pScreen);
 
@@ -128,7 +131,7 @@ CursorDisplayCursor (ScreenPtr pScreen,
 
     Unwrap (cs, pScreen, DisplayCursor);
 
-    if (cs->pCursorHideCounts != NULL) {
+    if (cs->pCursorHideCounts != NULL || CursorGloballyHidden) {
 	ret = (*pScreen->DisplayCursor) (pScreen, pInvisibleCursor);
     } else {
 	ret = (*pScreen->DisplayCursor) (pScreen, pCursor);
@@ -856,6 +859,12 @@ ProcXFixesHideCursor (ClientPtr client)
 	return (ret == BadValue) ? BadWindow : ret;
     }
 
+    /* Is cursor set to be initially hidden ?, if so reset this 
+     * flag as now visibility assumed under control of client.
+    */
+    if (CursorGloballyHidden)
+      CursorGloballyHidden = FALSE;
+
     /* 
      * Has client hidden the cursor before on this screen? 
      * If so, just increment the count. 
@@ -914,9 +923,19 @@ ProcXFixesShowCursor (ClientPtr client)
 	return (rc == BadValue) ? BadWindow : rc;
     }
 
+    /* X was started with cursor hidden, therefore just reset our flag
+     * (returning to normal client control) and cause cursor to now be
+     * shown.
+    */
+    if (CursorGloballyHidden == TRUE)
+      {
+	CursorGloballyHidden = FALSE;
+	return (client->noClientException);
+      }
+
     /* 
      * Has client hidden the cursor on this screen?
-     * If not, generate an error.
+     * If so, generate an error.
      */
     pChc = findCursorHideCount(client, pWin->drawable.pScreen);
     if (pChc == NULL) {
@@ -1031,6 +1050,8 @@ Bool
 XFixesCursorInit (void)
 {
     int	i;
+
+    CursorGloballyHidden = CursorInitiallyHidden;
     
     for (i = 0; i < screenInfo.numScreens; i++)
     {
