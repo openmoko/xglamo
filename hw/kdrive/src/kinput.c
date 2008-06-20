@@ -381,6 +381,18 @@ KdSetMouseMatrix (KdMouseMatrix *matrix)
 }
 
 void
+KdScreenToMouseCoords (int *x, int *y)
+{
+    int	(*m)[3] = kdMouseMatrix.matrix;
+    int div = m[0][1] * m[1][0] - m[1][1] * m[0][0];
+    int sx = *x;
+    int sy = *y;
+
+    *x = (m[0][1] * sy - m[0][1] * m[1][2] + m[1][1] * m[0][2] - m[1][1] * sx) / div;
+    *y = (m[1][0] * sx + m[0][0] * m[1][2] - m[1][0] * m[0][2] - m[0][0] * sy) / div;
+}
+
+void
 KdComputeMouseMatrix (KdMouseMatrix *m, Rotation randr, int width, int height)
 {
     int		    x_dir = 1, y_dir = 1;

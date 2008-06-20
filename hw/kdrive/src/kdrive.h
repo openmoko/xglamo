@@ -746,6 +746,9 @@ void
 KdSetMouseMatrix (KdMouseMatrix *matrix);
 
 void
+KdScreenToMouseCoords (int *x, int *y);
+
+void
 KdComputeMouseMatrix (KdMouseMatrix *matrix, Rotation randr, int width, int height);
     
 void
