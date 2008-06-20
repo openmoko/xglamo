@@ -211,6 +211,11 @@ fbdevScreenInitialize (KdScreenInfo *screen, FbdevScrPriv *scrpriv)
     if (k < 0)
         perror ("FBIOGET_FSCREENINFO");
 
+    /* Re-get the "fixed" parameters since they might have changed */
+    k = ioctl (priv->fd, FBIOGET_FSCREENINFO, &priv->fix);
+    if (k < 0)
+        perror ("FBIOGET_FSCREENINFO");
+
     /* Now get the new screeninfo */
     ioctl (priv->fd, FBIOGET_VSCREENINFO, &priv->var);
     depth = priv->var.bits_per_pixel;
