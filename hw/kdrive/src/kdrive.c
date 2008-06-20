@@ -72,6 +72,7 @@ Bool                kdDontZap;
 Bool		    kdEnabled;
 int		    kdSubpixelOrder;
 int		    kdVirtualTerminal = -1;
+char		    *kdKeyboard = 0;
 Bool		    kdSwitchPending;
 char		    *kdSwitchCmd;
 DDXPointRec	    kdOrigin;
@@ -789,6 +790,14 @@ KdProcessArgument (int argc, char **argv, int i)
     {
 	if ((i+1) < argc)
 	    KdParseMouse (argv[i+1]);
+	else
+	    UseMsg ();
+	return 2;
+    }
+    if (!strcmp (argv[i], "-keyboard"))
+    {
+	if ((i+1) < argc)
+	    kdKeyboard = argv[i+1];
 	else
 	    UseMsg ();
 	return 2;

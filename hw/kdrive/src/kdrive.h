@@ -416,6 +416,7 @@ extern Bool		kdEmulateMiddleButton;
 extern Bool		kdDisableZaphod;
 extern Bool		kdDontZap;
 extern int		kdVirtualTerminal;
+extern char		*kdKeyboard;
 extern char		*kdSwitchCmd;
 extern KdOsFuncs	*kdOsFuncs;
 
@@ -769,7 +770,7 @@ void
 ProcessInputEvents (void);
 
 extern KdMouseFuncs	LinuxMouseFuncs;
-extern KdMouseFuncs	LinuxEvdevFuncs;
+extern KdMouseFuncs	LinuxEvdevMouseFuncs;
 extern KdMouseFuncs	Ps2MouseFuncs;
 extern KdMouseFuncs	BusMouseFuncs;
 extern KdMouseFuncs	MsMouseFuncs;
@@ -777,6 +778,7 @@ extern KdMouseFuncs	MsMouseFuncs;
 extern KdMouseFuncs	TsFuncs;
 #endif
 extern KdKeyboardFuncs	LinuxKeyboardFuncs;
+extern KdKeyboardFuncs	LinuxEvdevKeyboardFuncs;
 extern KdOsFuncs	LinuxFuncs;
 
 extern KdMouseFuncs	VxWorksMouseFuncs;

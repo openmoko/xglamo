@@ -1303,6 +1303,7 @@ KdEnqueueKeyboardEvent(unsigned char	scan_code,
 	    xE.u.u.type = KeyPress;
 	xE.u.u.detail = key_code;
 	
+#ifndef XKB
 	switch (KEYCOL1(key_code)) 
 	{
 	case XK_Num_Lock:
@@ -1316,6 +1317,7 @@ KdEnqueueKeyboardEvent(unsigned char	scan_code,
 	    else
 		xE.u.u.type = KeyPress;
 	}
+#endif
 	
 	/*
 	 * Check pressed keys which are already down
