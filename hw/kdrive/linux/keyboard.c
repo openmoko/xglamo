@@ -407,7 +407,7 @@ LinuxKeyboardRead (int fd, void *closure)
                  * Commit high key codes
                  */ 
                 if (seen_high_key >= 3) {
-                    int keycode = ((b[1] & 0x7f) << 7) | (b[2] & 0x7f);
+                    int keycode = ((high_keys[1] & 0x7f) << 7) | (high_keys[2] & 0x7f);
                     KdEnqueueKeyboardEvent (keycode, high_keys[0] & 0x80);
 
                     seen_high_key = 0;
