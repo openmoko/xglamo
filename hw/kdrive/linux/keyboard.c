@@ -408,7 +408,8 @@ LinuxKeyboardRead (int fd, void *closure)
                  */ 
                 if (seen_high_key >= 3) {
                     int keycode = ((high_keys[1] & 0x7f) << 7) | (high_keys[2] & 0x7f);
-                    KdEnqueueKeyboardEvent (keycode, high_keys[0] & 0x80);
+                    if (keycode < NR_KEYS)
+                        KdEnqueueKeyboardEvent (keycode, high_keys[0] & 0x80);
 
                     seen_high_key = 0;
                     high_keys[0] = high_keys[1] = high_keys[2] = 0;
