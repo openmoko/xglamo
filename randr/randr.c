@@ -359,7 +359,9 @@ RRExtensionInit (void)
     EventSwapVector[RREventBase + RRNotify] = (EventSwapPtr)
 	SRRNotifyEvent;
 
+#ifdef XINERAMA
     RRXineramaExtensionInit();
+#endif
 }
 
 static int
