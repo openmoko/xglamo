@@ -420,14 +420,16 @@ glamoSetScannoutGeometry (ScreenPtr pScreen,
 		  priv->var.xres, priv->var.yres, priv->fix.line_length,
 		  priv->var.xres_virtual, priv->var.yres_virtual,
 		  priv->var.rotate);
-	pScreen->width = screen->width = priv->var.xres;
-	pScreen->height = screen->height = priv->var.yres;
-	screen->fb[0].byteStride =
-			screen->width * screen->fb[0].bitsPerPixel / 8;
 	screen->randr = rotation;
 	memset(&m, 0, sizeof(m));
 	KdComputeMouseMatrix(&m, screen->randr, screen->width, screen->height);
 	KdSetMouseMatrix(&m);
+
+	pScreen->width = screen->width = priv->var.xres;
+	pScreen->height = screen->height = priv->var.yres;
+	screen->fb[0].byteStride =
+			screen->width * screen->fb[0].bitsPerPixel / 8;
+	
 	/*TODO: not yet supported by glamo fb module*/
 	pScreen->mmWidth = priv->var.width;
 	pScreen->mmHeight = priv->var.height;
