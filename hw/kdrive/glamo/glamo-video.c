@@ -51,10 +51,6 @@
 static void
 GLAMOStopVideo(KdScreenInfo *screen, pointer data, Bool exit)
 {
-	ScreenPtr pScreen = screen->pScreen;
-	GLAMOPortPrivPtr pPortPriv = (GLAMOPortPrivPtr)data;
-
-
 	GLAMO_LOG("enter\n");
 
 
@@ -68,7 +64,6 @@ GLAMOStopVideo(KdScreenInfo *screen, pointer data, Bool exit)
 
 
 	GLAMO_LOG("leave\n");
-
 }
 
 static int
@@ -103,11 +98,6 @@ GLAMOQueryBestSize(KdScreenInfo *screen,
 static void
 GLAMOVideoSave(ScreenPtr pScreen, KdOffscreenArea *area)
 {
-	KdScreenPriv(pScreen);
-	GLAMOScreenInfo(pScreenPriv);
-	GLAMOPortPrivPtr pPortPriv = glamos->pAdaptor->pPortPrivates[0].ptr;
-	int i;
-
 	GLAMO_LOG("mark\n");
 }
 

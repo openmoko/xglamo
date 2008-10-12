@@ -428,8 +428,6 @@ GLAMOCMDQInit(ScreenPtr pScreen,
 {
 	KdScreenPriv(pScreen);
 	GLAMOScreenInfo(pScreenPriv);
-	GLAMOCardInfo(pScreenPriv);
-	char *mmio = glamoc->reg_base;
 	int cq_len = CQ_LEN;
 
 	if (!force && glamos->use_exa && glamos->exa_cmd_queue)

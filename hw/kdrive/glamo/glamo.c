@@ -33,6 +33,8 @@
 #include "glamo.h"
 #include "glamo-log.h"
 
+#include <sys/ioctl.h>
+
 static Bool
 GLAMOCardInit(KdCardInfo *card)
 {
@@ -93,7 +95,6 @@ static void
 GLAMOSetOffscreen (KdScreenInfo *screen)
 {
 	GLAMOCardInfo(screen);
-	FbdevPriv *priv = screen->card->driver;
 	int screen_size;
 	char *mmio = glamoc->reg_base;
 
@@ -299,11 +300,9 @@ glamoSetScannoutGeometry (ScreenPtr pScreen,
 {
 	KdScreenPriv(pScreen);
         KdScreenInfo *screen = pScreenPriv->screen;
-	GLAMOCardInfo(screen);
 	FbdevPriv *priv = screen->card->driver;
 	struct fb_var_screeninfo	var;
-	int byte_stride=0, k = 0, is_ok = FALSE;
-	KdMouseMatrix m;
+	int k = 0, is_ok = FALSE;
 	Bool is_portrait = TRUE, orientation_will_change = FALSE;
         int new_xres = 0, new_yres = 0;
 
@@ -421,9 +420,6 @@ glamoSetScannoutGeometry (ScreenPtr pScreen,
 		  priv->var.xres_virtual, priv->var.yres_virtual,
 		  priv->var.rotate);
 	screen->randr = rotation;
-	memset(&m, 0, sizeof(m));
-	KdComputeMouseMatrix(&m, screen->randr, screen->width, screen->height);
-	KdSetMouseMatrix(&m);
 
 	pScreen->width = screen->width = priv->var.xres;
 	pScreen->height = screen->height = priv->var.yres;
@@ -447,7 +443,6 @@ GLAMORandRSetConfig (ScreenPtr		pScreen,
 {
 	KdScreenPriv(pScreen);
 	KdScreenInfo *screen = pScreenPriv->screen;
-	GLAMOCardInfo *glamoc = screen->card->driver;
 	Bool enabled = TRUE;
 	int byte_stride = 0;
 
