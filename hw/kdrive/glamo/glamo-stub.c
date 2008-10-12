@@ -62,27 +62,18 @@ InitOutput(ScreenInfo *pScreenInfo, int argc, char **argv)
 void
 InitInput(int argc, char **argv)
 {
-    if (use_evdev)
-        KdInitInput (&LinuxEvdevMouseFuncs, &LinuxEvdevKeyboardFuncs);
-    else
-        KdInitInput (&LinuxMouseFuncs, &LinuxKeyboardFuncs);
-#ifdef TOUCHSCREEN
-    KdAddMouseDriver (&TsFuncs);
-#endif
+    KdOsAddInputDrivers();
+    KdInitInput();
 }
 
 void
 ddxUseMsg (void)
 {
-	KdUseMsg();
+    KdUseMsg();
 }
 
 int
 ddxProcessArgument(int argc, char **argv, int i)
 {
-	int	ret;
-
-		ret = KdProcessArgument(argc, argv, i);
-
-	return ret;
+    return KdProcessArgument(argc, argv, i);
 }
