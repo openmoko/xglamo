@@ -14,6 +14,10 @@ if H3600_TS
 TS_C = ts.c
 endif
 
+if XKB
+XKB_C = keyboard_xkb.c
+endif
+
 if KDRIVE_HW
 KDRIVE_HW_SOURCES =	\
 	agp.c		\
@@ -30,5 +34,6 @@ liblinux_a_SOURCES = 	\
 	ms.c		\
 	ps2.c		\
 	$(KDRIVE_HW_SOURCES) \
+	$(XKB_C)	\
 	$(TSLIB_C)	\
 	$(TS_C)
