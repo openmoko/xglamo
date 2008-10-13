@@ -35,28 +35,28 @@ extern int use_evdev;
 void
 InitCard(char *name)
 {
-	KdCardAttr attr;
+    KdCardAttr attr;
 
-	attr.io = 0;
-	attr.address[0] = 0x8000000;
-	attr.naddr = 1;
-	KdCardInfoAdd(&GLAMOFuncs, &attr, 0);
+    attr.io = 0;
+    attr.address[0] = 0x8000000;
+    attr.naddr = 1;
+    KdCardInfoAdd(&GLAMOFuncs, &attr, 0);
 }
 
 void
 InitOutput(ScreenInfo *pScreenInfo, int argc, char **argv)
 {
-	char *verbosity_str=NULL;
-	int verbosity=0;
-	verbosity_str = getenv("VERBOSITY");
-	if (!verbosity_str) {
-		verbosity = 5;
-	} else {
-		verbosity = atoi(verbosity_str);
-	}
-	LogSetParameter(XLOG_VERBOSITY, verbosity) ;
-	LogMessage(X_INFO, "verbosity set to %d\n", verbosity);
-	KdInitOutput(pScreenInfo, argc, argv);
+    char *verbosity_str=NULL;
+    int verbosity=0;
+    verbosity_str = getenv("VERBOSITY");
+    if (!verbosity_str) {
+        verbosity = 5;
+    } else {
+        verbosity = atoi(verbosity_str);
+    }
+    LogSetParameter(XLOG_VERBOSITY, verbosity) ;
+    LogMessage(X_INFO, "verbosity set to %d\n", verbosity);
+    KdInitOutput(pScreenInfo, argc, argv);
 }
 
 void
