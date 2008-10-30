@@ -62,6 +62,7 @@ static KdMouseMatrix	kdMouseMatrix = {
    { { 1, 0, 0 },
      { 0, 1, 0 } }
 };
+static int kdMouseScalX = 1, kdMouseScalY = 1;
 
 int		kdMouseButtonCount;
 int		kdMinScanCode;
@@ -380,13 +381,22 @@ KdSetMouseMatrix (KdMouseMatrix *matrix)
     kdMouseMatrix = *matrix;
 }
 
+void KdSetMouseScaling (int scalX, int scalY) {
+    if(!scalX)
+	scalX = 1;
+    kdMouseScalX = scalX;
+    if(!scalY)
+	scalY = 1;
+    kdMouseScalY = scalY;
+}
+
 void
 KdScreenToMouseCoords (int *x, int *y)
 {
     int	(*m)[3] = kdMouseMatrix.matrix;
     int div = m[0][1] * m[1][0] - m[1][1] * m[0][0];
-    int sx = *x;
-    int sy = *y;
+    int sx = *x * kdMouseScalX;
+    int sy = *y * kdMouseScalY;
 
     *x = (m[0][1] * sy - m[0][1] * m[1][2] + m[1][1] * m[0][2] - m[1][1] * sx) / div;
     *y = (m[1][0] * sx + m[0][0] * m[1][2] - m[1][0] * m[0][2] - m[0][0] * sy) / div;
@@ -1453,6 +1463,9 @@ KdEnqueueMouseEvent(KdMouseInfo *mi, unsigned long flags, int rx, int ry)
 	{
 	    x = matrix[0][0] * rx + matrix[0][1] * ry + matrix[0][2];
 	    y = matrix[1][0] * rx + matrix[1][1] * ry + matrix[1][2];
+
+	    x /= kdMouseScalX;
+	    y /= kdMouseScalY;
 	}
 	else
 	{

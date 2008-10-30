@@ -265,6 +265,7 @@ glamoSetLCDResolution (int width, int height)
 {
 	Bool is_ok = FALSE;
 	int fd = 0;
+	int scalX, scalY;
 
 	GLAMO_LOG("enter\n");
 
@@ -274,16 +275,19 @@ glamoSetLCDResolution (int width, int height)
 	}
 	if ((width == 240 && height == 320)
 	     || (width == 320 && height == 240)) {
+		scalX = scalY = 2;
 		write(fd, QVGA_MODE, sizeof(QVGA_MODE));
 		GLAMO_LOG("set mode to %s\n", QVGA_MODE);
 	} else if ((width == 480 && height == 640)
 		   || (width == 640 && height == 480)) {
+		scalX = scalY = 1;
 		write(fd, VGA_MODE, sizeof(VGA_MODE));
 		GLAMO_LOG("set mode to %s\n", VGA_MODE);
 	} else {
 		GLAMO_LOG_ERROR("unknown mode: (%dx%d)\n", width, height);
 		goto out;
 	}
+	KdSetMouseScaling(scalX, scalY);
 	is_ok = TRUE;
 out:
 	if (fd > 0)

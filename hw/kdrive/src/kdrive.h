@@ -745,6 +745,13 @@ KdSetLed (int led, Bool on);
 void
 KdSetMouseMatrix (KdMouseMatrix *matrix);
 
+/**
+ * Mouse coords will be divieded by those before the mouse matrix is
+ * applied
+ **/
+void
+KdSetMouseScaling (int scalX, int scalY);
+
 void
 KdScreenToMouseCoords (int *x, int *y);
 
