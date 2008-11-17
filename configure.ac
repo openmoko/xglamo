@@ -915,7 +915,7 @@ int main(int argc, char *argv[]) {
         return 1;
 }
     ], [MONOTONIC_CLOCK=yes], [MONOTONIC_CLOCK=no],
-       [MONOTONIC_CLOCK="cross compiling"])
+       [MONOTONIC_CLOCK="yes"])
 else
     MONOTONIC_CLOCK=no
 fi
