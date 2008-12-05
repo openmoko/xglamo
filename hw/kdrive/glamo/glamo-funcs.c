@@ -29,12 +29,6 @@
 #include "glamo-regs.h"
 #include "glamo-cmdq.h"
 
-#define GLAMO_OUT_REG(glamo_mmio, reg, val) \
-	(*((volatile unsigned short *) ((glamo_mmio) + (reg))) = (val))
-
-#define GLAMO_IN_REG(glamo_mmio, reg) \
-	(*((volatile unsigned short *) ((glamo_mmio) + (reg))))
-
 void
 GLAMOOutReg(ScreenPtr pScreen, unsigned short reg, unsigned short val)
 {
@@ -46,7 +40,7 @@ GLAMOOutReg(ScreenPtr pScreen, unsigned short reg, unsigned short val)
 		GLAMO_LOG_ERROR("got null glamoc->reg_base\n");
 		return;
 	}
-	GLAMO_OUT_REG(glamoc->reg_base, reg, val);
+	MMIO_OUT16(glamoc->reg_base, reg, val);
 }
 
 unsigned short
@@ -60,7 +54,7 @@ GLAMOInReg(ScreenPtr pScreen, unsigned short reg)
 		GLAMO_LOG_ERROR("got null glamoc->reg_base\n");
 		return 0;
 	}
-	return GLAMO_IN_REG(glamoc->reg_base, reg);
+	return MMIO_IN16(glamoc->reg_base, reg);
 }
 
 void
